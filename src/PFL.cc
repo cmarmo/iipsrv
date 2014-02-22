@@ -141,6 +141,7 @@ void PFL::run( Session* session, const std::string& argument ){
     for( unsigned int j=0; j<length; j++ ){
 
       float intensity;
+      char c_intensity[24];
       void *ptr;
 
       // Handle depending on bit depth
@@ -163,8 +164,9 @@ void PFL::run( Session* session, const std::string& argument ){
 	}
       }
 
-      if( rawtile.sampleType == FLOATINGPOINT ) profile << fixed;
-      profile << intensity;
+      //if( rawtile.sampleType == FLOATINGPOINT ) profile << fixed;
+      snprintf( c_intensity, 24, "%.9g", intensity );
+      profile << c_intensity;
       if( j < length-1 ) profile << ",";
 
     }
