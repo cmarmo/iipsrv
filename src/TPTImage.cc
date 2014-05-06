@@ -64,8 +64,8 @@ void TPTImage::loadImageInfo( int seq, int ang ) throw(string)
   tdir_t current_dir;
   int count;
   uint16 colour, samplesperpixel, bitspersample, sampleformat;
-  double sminvalue[4] = {0.0};
-  double smaxvalue[4] = {0.0};
+  double sminvaluearr[4] = {0.0}, smaxvaluearr[4] = {0.0},
+	 *sminvalue=NULL, *smaxvalue=NULL;
   unsigned int w, h;
   string filename;
   char *tmp = NULL;
@@ -124,13 +124,26 @@ void TPTImage::loadImageInfo( int seq, int ang ) throw(string)
   else colourspace = sRGB;
 
   // Get the max and min values for our data type - required for floats
+  /*---- Hacky TIFF feature: see http://www.asmail.be/msg0055458208.html */
+#ifdef TIFFTAG_PERSAMPLE
+  if( channels>1 ) {
+    TIFFSetField(tiff, TIFFTAG_PERSAMPLE, PERSAMPLE_MULTI);
+    TIFFGetFieldDefaulted( tiff, TIFFTAG_SMINSAMPLEVALUE, &sminvalue );
+    TIFFGetFieldDefaulted( tiff, TIFFTAG_SMAXSAMPLEVALUE, &smaxvalue );
+    TIFFSetField(tiff, TIFFTAG_PERSAMPLE, PERSAMPLE_MERGED);
+  } else {
+#endif
+  sminvalue = sminvaluearr;
+  smaxvalue = smaxvaluearr;
   TIFFGetFieldDefaulted( tiff, TIFFTAG_SMINSAMPLEVALUE, sminvalue );
   TIFFGetFieldDefaulted( tiff, TIFFTAG_SMAXSAMPLEVALUE, smaxvalue );
+#ifdef TIFFTAG_PERSAMPLE
+  }
+#endif
   min.clear();
   max.clear();
   for( int i=0; i<channels; i++ ){
-    if( (float)smaxvalue[i] == 0.0 ){
-      sminvalue[i] = 0.0;
+    if( sminvalue[i] == smaxvalue[i] ){
       // Set default values if values not included in header
       if( bpp == 8 ) smaxvalue[i] = 255.0;
       else if( bpp == 16 ) smaxvalue[i] = 65535.0;
