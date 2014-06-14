@@ -131,6 +131,8 @@ void TPTImage::loadImageInfo( int seq, int ang ) throw(string)
     TIFFGetFieldDefaulted( tiff, TIFFTAG_SMINSAMPLEVALUE, &sminvalue );
     TIFFGetFieldDefaulted( tiff, TIFFTAG_SMAXSAMPLEVALUE, &smaxvalue );
     TIFFSetField(tiff, TIFFTAG_PERSAMPLE, PERSAMPLE_MERGED);
+    if (!sminvalue) sminvalue = sminvaluearr;
+    if (!smaxvalue) smaxvalue = smaxvaluearr;
   } else {
 #endif
   sminvalue = sminvaluearr;
@@ -143,7 +145,7 @@ void TPTImage::loadImageInfo( int seq, int ang ) throw(string)
   min.clear();
   max.clear();
   for( int i=0; i<channels; i++ ){
-    if( sminvalue[i] == smaxvalue[i] ){
+    if( !sminvalue == smaxvalue[i] ){
       // Set default values if values not included in header
       if( bpp == 8 ) smaxvalue[i] = 255.0;
       else if( bpp == 16 ) smaxvalue[i] = 65535.0;
