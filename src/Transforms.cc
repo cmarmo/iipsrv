@@ -29,6 +29,7 @@
 #define D65_Y0 100.0
 #define D65_Z0 108.8827
 
+using namespace std;
 
 static const float _sRGB[3][3] = { {  3.240479, -1.537150, -0.498535 },
 				   { -0.969256, 1.875992, 0.041556 },
@@ -622,3 +623,69 @@ void filter_greyscale( RawTile& rawtile ){
   rawtile.channels = 1;
   rawtile.dataLength = np;
 }
+
+// Apply twist or channel recombination to colour or multi-channel image
+void filter_twist( RawTile& rawtile, const vector< vector<float> >& matrix ){
+
+  unsigned long np = rawtile.width * rawtile.height;
+  unsigned long n = 0;
+
+  // Create temporary buffer for our calculated values
+  float* pixel = new float[rawtile.channels];
+
+  // Calculate the number of columns - limit to our number of channels if necessary
+  unsigned int ncols = (matrix.size()>rawtile.channels) ? rawtile.channels : matrix.size();
+  unsigned int* nrows = new unsigned int[ncols];
+
+  // Pre-calculate the size of each row
+  for( unsigned int i=0; i<ncols; i++ ){
+    nrows[i] = (matrix[i].size()>rawtile.channels) ? rawtile.channels : matrix[i].size();
+  }
+
+  for( unsigned long i=0; i<np; i++ ){
+
+    // Calculate value for each channel
+    for( unsigned int k=0; k<ncols; k++ ){
+
+      // Zero our pixel buffer
+      pixel[k] = 0.0;
+
+      for( unsigned int j=0; j<nrows[k]; j++ ){
+float m = matrix[k][j];
+if( m ){
+pixel[k] += (m == 1.0) ? ((float*)rawtile.data)[n+j] : ((float*)rawtile.data)[n+j] * m;
+}
+      }
+    }
+
+    // Only write our values at the end as we reuse channel values several times during the twist loops
+    for( unsigned int k=0; k<rawtile.channels; k++ ) ((float*)rawtile.data)[n++] = pixel[k];
+
+  }
+  delete[] nrows;
+  delete[] pixel;
+}
+
+
+void filter_flatten( RawTile& in, int bands ){
+
+  // We cannot increase the number of channels
+  if( bands >= in.channels ) return;
+
+  unsigned long np = in.width * in.height;
+  unsigned long ni = 0;
+  unsigned long no = 0;
+  unsigned int gap = in.channels - bands;
+
+  // Simply loop through assigning to the same buffer
+  for( unsigned long i=0; i<np; i++ ){
+    for( unsigned int k=0; k<bands; k++ ){
+      ((float*)in.data)[ni++] = ((float*)in.data)[no++];
+    }
+    no += gap;
+  }
+
+  in.channels = bands;
+  in.dataLength = ni * in.bpc/8;
+}
+

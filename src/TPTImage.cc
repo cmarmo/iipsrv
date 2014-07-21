@@ -24,9 +24,9 @@
 #include "TPTImage.h"
 #include <sstream>
 
+TIFFCacheMapType	tiffCache;
 
 using namespace std;
-
 
 void TPTImage::openImage() throw (string)
 {
@@ -41,9 +41,30 @@ void TPTImage::openImage() throw (string)
   // Update our timestamp
   updateTimestamp( filename );
 
-  // Try to open and allocate a buffer
-  if( ( tiff = TIFFOpen( filename.c_str(), "r" ) ) == NULL ){
-    throw string( "tiff open failed for: " + filename );
+  if ( tiffCache.empty() ){
+    if( ( tiff = TIFFOpen( filename.c_str(), "r" ) ) == NULL ){
+      throw string( "tiff open failed for: " + filename );
+    }
+    tiffCache[ filename ] = tiff;
+  }
+    // If not, look up our object
+  else{
+    // Cache Hit
+    if( tiffCache.find(filename) != tiffCache.end() ){
+      tiff = tiffCache[ filename ];
+    }
+    // Cache Miss
+    else{
+      if( ( tiff = TIFFOpen( filename.c_str(), "r" ) ) == NULL ){
+        throw string( "tiff open failed for: " + filename );
+      }
+    // Delete items if our list of files is too long.
+      if( tiffCache.size() >= MAX_TIFF_CACHE ) {
+        TIFFClose( tiffCache.begin()->second );
+        tiffCache.erase( tiffCache.begin() );
+      }
+      tiffCache[ filename ] = tiff;
+    }
   }
 
   // Load our metadata if not already loaded
@@ -169,7 +190,7 @@ void TPTImage::loadImageInfo( int seq, int ang ) throw(string)
 void TPTImage::closeImage()
 {
   if( tiff != NULL ){
-    TIFFClose( tiff );
+//    TIFFClose( tiff );
     tiff = NULL;
   }
   if( tile_buf != NULL ){
@@ -205,8 +226,30 @@ RawTile TPTImage::getTile( int seq, int ang, unsigned int res, int layers, unsig
   // Open the TIFF if it's not already open
   if( !tiff ){
     filename = getFileName( seq, ang );
-    if( ( tiff = TIFFOpen( filename.c_str(), "r" ) ) == NULL ){
-      throw string( "tiff open failed for:" + filename );
+    if ( tiffCache.empty() ){
+      if( ( tiff = TIFFOpen( filename.c_str(), "r" ) ) == NULL ){
+        throw string( "tiff open failed for: " + filename );
+      }
+      tiffCache[ filename ] = tiff;
+    }
+      // If not, look up our object
+    else{
+      // Cache Hit
+      if( tiffCache.find(filename) != tiffCache.end() ){
+        tiff = tiffCache[ filename ];
+      }
+      // Cache Miss
+      else{
+        if( ( tiff = TIFFOpen( filename.c_str(), "r" ) ) == NULL ){
+          throw string( "tiff open failed for: " + filename );
+        }
+      // Delete items if our list of files is too long.
+        if( tiffCache.size() >= MAX_TIFF_CACHE ) {
+          TIFFClose( tiffCache.begin()->second );
+          tiffCache.erase( tiffCache.begin() );
+        }
+        tiffCache[ filename ] = tiff;
+      }
     }
   }
 

@@ -214,6 +214,31 @@ void CVT::run( Session* session, const std::string& a ){
       channels = 1;
     }
 
+    // Apply color twist if requested
+    if( session->view->ctw.size() ){
+      if( session->loglevel >= 3 ){
+        *(session->logfile) << "CVT :: Applying color twist" << endl;
+      }
+      filter_twist( complete_image, session->view->ctw );
+    }
+
+    // Reduce to 1 or 3 bands if we have an alpha channel or a multi-band image
+    if( complete_image.channels == 2 ){
+      if( session->loglevel >= 3 ){
+*(session->logfile) << "CVT :: Flattening to 1 channel" << endl;
+      }
+      filter_flatten( complete_image, 1 );
+      // Don't forget to reset our channels variable as this is used later
+      channels = 1;
+    }
+    else if( complete_image.channels > 3 ){
+      if( session->loglevel >= 3 ){
+*(session->logfile) << "CVT :: Flattening to 3 channels" << endl;
+      }
+      filter_flatten( complete_image, 3 );
+      channels = 3;
+    }
+
     // Apply any gamma correction
     if( session->view->getGamma() != 1.0 ){
       float gamma = session->view->getGamma();

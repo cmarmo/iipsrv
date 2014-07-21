@@ -331,4 +331,10 @@ class DeepZoom : public Task {
   void run( Session* session, const std::string& argument );
 };
 
+/// Color Twist Command
+class CTW : public Task {
+ public:
+  void run( Session* session, const std::string& argument );
+};
+
 #endif

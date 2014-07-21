@@ -89,6 +89,7 @@ void JTL::run( Session* session, const std::string& argument ){
   else if( session->view->shaded ) ct = UNCOMPRESSED;
   else if( session->view->cmapped ) ct = UNCOMPRESSED;
   else if( session->view->inverted ) ct = UNCOMPRESSED;
+  else if( session->view->ctw.size() ) ct = UNCOMPRESSED;
   else ct = JPEG;
 
   RawTile rawtile = tilemanager.getTile( resolution, tile, session->view->xangle,
@@ -144,6 +145,31 @@ void JTL::run( Session* session, const std::string& argument ){
     filter_shade( rawtile, session->view->shade[0], session->view->shade[1] );
   }
 
+  // Apply color twist if requested
+  if( session->view->ctw.size() ){
+    if( session->loglevel >= 4 ){
+      *(session->logfile) << "JTL :: Applying color twist";
+      function_timer.start();
+    }
+    filter_twist( rawtile, session->view->ctw );
+    if( session->loglevel >= 4 ){
+      *(session->logfile) << " in " << function_timer.getTime() << " microseconds" << endl;
+    }
+  }
+
+  // Reduce to 1 or 3 bands if we have an alpha channel or a multi-band image
+  if( rawtile.channels == 2 || rawtile.channels > 3 ){
+    unsigned int bands = (rawtile.channels==2) ? 1 : 3;
+    if( session->loglevel >= 4 ){
+      *(session->logfile) << "JTL :: Flattening channels to " << bands;
+      function_timer.start();
+    }
+    filter_flatten( rawtile, bands );
+    if( session->loglevel >= 4 ){
+      *(session->logfile) << " in " << function_timer.getTime() << " microseconds" << endl;
+    }
+  }
+
   // Apply any gamma correction
   if( session->view->getGamma() != 1.0 ){
     float gamma = session->view->getGamma();
@@ -183,7 +209,6 @@ void JTL::run( Session* session, const std::string& argument ){
   if( session->loglevel >= 3 ){
     *(session->logfile) << "JTL :: Conversion to 8 bit applied in " << function_timer.getTime() << " microseconds" << endl;
   }
-
 
   // Convert to greyscale if requested
   if( (*session->image)->getColourSpace() == sRGB && session->view->colourspace == GREYSCALE ){

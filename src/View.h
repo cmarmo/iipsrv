@@ -77,6 +77,8 @@ class View{
   int max_layers;			       /// Maximum number of quality layers allowed
   int layers;			               /// Number of quality layers
   ColourSpaces colourspace;                    /// Requested colourspace
+  std::vector< std::vector<float> > ctw;       /// Colour twist matrix
+
 
 
   /// Constructor
