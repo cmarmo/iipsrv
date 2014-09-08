@@ -80,24 +80,11 @@ void JTL::run( Session* session, const std::string& argument ){
 
   TileManager tilemanager( session->tileCache, *session->image, session->watermark, session->jpeg, session->logfile, session->loglevel );
 
+  // Setting compression type to UNCOMPRESSED to force all image types to go through normalization
   CompressionType ct;
-  if( (*session->image)->getNumBitsPerPixel() > 8 ) ct = UNCOMPRESSED;
-  else if( (*session->image)->getColourSpace() == CIELAB ) ct = UNCOMPRESSED;
-  else if( session->view->getContrast() != 1.0 ) ct = UNCOMPRESSED;
-  else if( session->view->getGamma() != 1.0 ) ct = UNCOMPRESSED;
-  else if( session->view->getRotation() != 0.0 ) ct = UNCOMPRESSED;
-  else if( session->view->shaded ) ct = UNCOMPRESSED;
-  else if( session->view->cmapped ) ct = UNCOMPRESSED;
-  else if( session->view->inverted ) ct = UNCOMPRESSED;
-  else if( session->view->ctw.size() ) ct = UNCOMPRESSED;
-  else ct = JPEG;
-
+  ct = UNCOMPRESSED;
   RawTile rawtile = tilemanager.getTile( resolution, tile, session->view->xangle,
 					 session->view->yangle, session->view->getLayers(), ct );
-
-  // For image sequences where images are not all the same bitdepth, the TileManager will return an uncompressed tile
-  if( rawtile.bpc > 8 ) ct = UNCOMPRESSED;
-
 
   int len = rawtile.dataLength;
 
