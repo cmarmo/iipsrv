@@ -2,7 +2,7 @@
 
 /*  IIP fcgi server module
 
-    Copyright (C) 2000-2013 Ruven Pillay.
+    Copyright (C) 2000-2015 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -34,8 +34,20 @@
 #include <list>
 #include <vector>
 #include <map>
+#include <stdexcept>
 
 #include "RawTile.h"
+
+
+/// Define our own derived exception class for file errors
+class file_error : public std::runtime_error {
+ public:
+  file_error(std::string s) : std::runtime_error(s) { }
+};
+
+
+// Supported image formats
+enum ImageFormat { TIF, JPEG2000, UNSUPPORTED };
 
 
 
@@ -62,8 +74,11 @@ class IIPImage {
   /// Indicates whether our image is a single file or part or a sequence
   bool isFile;
 
+  /// Image file name suffix
+  std::string suffix;
+
   /// Private function to determine the image type
-  void testImageType();
+  void testImageType() throw( file_error );
 
   /// If we have a sequence of images, determine which horizontal angles exist
   void measureHorizontalAngles();
@@ -78,10 +93,19 @@ class IIPImage {
   std::list <int> verticalAnglesList;
 
 
- public:
+ protected:
 
-  /// Return the image type e.g. tif
-  std::string type;
+  /// LUT
+  std::vector <int> lut;
+
+  /// Number of resolution levels that don't physically exist in file
+  unsigned int virtual_levels;
+
+  /// Return the image format e.g. tif
+  ImageFormat format;
+
+
+ public:
 
   /// The image pixel dimensions
   std::vector <unsigned int> image_widths, image_heights;
@@ -95,8 +119,8 @@ class IIPImage {
   /// The number of available resolutions in this image
   unsigned int numResolutions;
 
-  /// The bits per pixel for this image
-  unsigned int bpp;
+  /// The bits per channel for this image
+  unsigned int bpc;
 
   /// The number of channels for this image
   unsigned int channels;
@@ -126,23 +150,78 @@ class IIPImage {
  public:
 
   /// Default Constructor
-  IIPImage();
+  IIPImage()
+   : isFile( false ),
+    tile_width( 0 ),
+    tile_height( 0 ),
+    bpc( 0 ),
+    channels( 0 ),
+    quality_layers( 0 ),
+    isSet( false ),
+    currentX( 0 ),
+    currentY( 90 ),
+    timestamp( 0 ) {};
 
   /// Constructer taking the image path as parameter
   /** @param s image path
    */
-  IIPImage( const std::string& s );
+  IIPImage( const std::string& s )
+   : imagePath( s ),
+    isFile( false ),
+    virtual_levels( 0 ),
+    tile_width( 0 ),
+    tile_height( 0 ),
+    bpc( 0 ),
+    channels( 0 ),
+    quality_layers( 0 ),
+    isSet( false ),
+    currentX( 0 ),
+    currentY( 90 ),
+    timestamp( 0 ) {};
 
   /// Copy Constructor taking reference to another IIPImage object
   /** @param im IIPImage object
    */
-  IIPImage( const IIPImage& im );
+  IIPImage( const IIPImage& image )
+   : imagePath( image.imagePath ),
+    fileSystemPrefix( image.fileSystemPrefix ),
+    fileNamePattern( image.fileNamePattern ),
+    isFile( image.isFile ),
+    suffix( image.suffix ),
+    horizontalAnglesList( image.horizontalAnglesList ),
+    verticalAnglesList( image.verticalAnglesList ),
+    lut( image.lut ),
+    virtual_levels( image.virtual_levels ),
+    format( image.format ),
+    image_widths( image.image_widths ),
+    image_heights( image.image_heights ),
+    tile_width( image.tile_width ),
+    tile_height( image.tile_height ),
+    colourspace( image.colourspace ),
+    numResolutions( image.numResolutions ),
+    bpc( image.bpc ),
+    channels( image.channels ),
+    sampleType( image.sampleType ),
+    min( image.min ),
+    max( image.max ),
+    quality_layers( image.quality_layers ),
+    isSet( image.isSet ),
+    currentX( image.currentX ),
+    currentY( image.currentY ),
+    metadata( image.metadata ),
+    timestamp( image.timestamp ) {};
 
   /// Virtual Destructor
   virtual ~IIPImage() { ; };
 
   /// Test the image and initialise some parameters
   void Initialise();
+
+  /// Swap function
+  /** @param a Object to copy to
+      @param b Object to copy from
+   */
+  void swap( IIPImage& a, IIPImage& b );
 
   /// Return a list of available vertical angles
   std::list <int> getVerticalViewsList(){ return verticalAnglesList; };
@@ -159,13 +238,14 @@ class IIPImage {
    */
   const std::string getFileName( int x, int y );
 
-  /// Get the image type
-  const std::string& getImageType() { return type; };
+  /// Get the image format
+  //  const std::string& getImageFormat() { return format; };
+  ImageFormat getImageFormat() { return format; };
 
   /// Get the image timestamp
   /** @param s file path
    */
-  void updateTimestamp( const std::string& s ) throw( std::string );
+  void updateTimestamp( const std::string& s ) throw( file_error );
 
   /// Get a HTTP RFC 1123 formatted timestamp
   const std::string getTimestamp();
@@ -180,10 +260,10 @@ class IIPImage {
   void setFileNamePattern( const std::string& pattern ) { fileNamePattern = pattern; };
 
   /// Return the number of available resolutions in the image
-  int getNumResolutions() { return numResolutions; };
+  unsigned int getNumResolutions() { return numResolutions; };
 
   /// Return the number of bits per pixel for this image
-  unsigned int getNumBitsPerPixel() { return bpp; };
+  unsigned int getNumBitsPerPixel() { return bpc; };
 
   /// Return the number of channels for this image
   unsigned int getNumChannels() { return channels; };
@@ -239,7 +319,7 @@ class IIPImage {
   virtual const std::string getDescription() { return std::string( "IIPImage Base Class" ); };
 
   /// Open the image: Overloaded by child class.
-  virtual void openImage() { throw std::string( "IIPImage openImage called" ); };
+  virtual void openImage() { throw file_error( "IIPImage openImage called" ); };
 
   /// Load information about the image eg. number of channels, tile size etc.
   /** @param x horizontal sequence angle
@@ -277,7 +357,11 @@ class IIPImage {
   virtual RawTile getRegion( int ha, int va, unsigned int r, int layers, int x, int y, unsigned int w, unsigned int h ){ return RawTile(); };
 
   /// Assignment operator
-  IIPImage& operator = ( const IIPImage& );
+  /** @param im IIPImage object */
+  IIPImage& operator = ( IIPImage image ){
+    swap( *this, image );
+    return *this;
+  };
 
   /// Comparison equality operator
   friend int operator == ( const IIPImage&, const IIPImage& );

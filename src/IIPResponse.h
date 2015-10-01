@@ -1,7 +1,7 @@
 /*
     IIP Response Handler Class
 
-    Copyright (C) 2003-2012 Ruven Pillay.
+    Copyright (C) 2003-2015 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -43,13 +43,15 @@ class IIPResponse{
  private:
 
   std::string server;              // Server header
+  std::string powered;             // Powered By header
   std::string modified;            // Last modified header
-  std::string cache;               // Cache control header
+  std::string cacheControl;        // Cache control header
   std::string mimeType;            // Mime type header
   std::string eof;                 // End of response delimitter eg "\r\n"
   std::string protocol;            // IIP protocol version
   std::string responseBody;        // The main response
   std::string error;               // Error message
+  std::string cors;                // CORS (Cross-Origin Resource Sharing) setting
   bool sent;                       // Indicate whether a response has been sent
 
 
@@ -106,6 +108,24 @@ class IIPResponse{
       @param arg the argument supplied by the client
    */
   void setError( const std::string& code, const std::string& arg );
+
+
+  /// Set CORS setting
+  /** @param cors setting */
+  void setCORS( const std::string& c ){ if(!c.empty()) cors = "Access-Control-Allow-Origin: " + c; };
+
+
+  /// Get CORS setting
+  std::string getCORS(){ return cors; };
+
+
+  /// Set Cache-Control value
+  /** @param Cache-Control setting */
+  void setCacheControl( const std::string& c ){ cacheControl = "Cache-Control: " + c; };
+
+
+  /// Get Cache-Control value
+  std::string getCacheControl(){ return cacheControl; };
 
 
   /// Get a formatted string to send back

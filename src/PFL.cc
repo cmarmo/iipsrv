@@ -1,7 +1,7 @@
 /*
     IIP Profile Command Handler Class Member Function
 
-    Copyright (C) 2013 Ruven Pillay.
+    Copyright (C) 2013-2015 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #include "Task.h"
 #include <cmath>
 #include <sstream>
+#include <iomanip>
 
 using namespace std;
 
@@ -38,7 +39,7 @@ void PFL::run( Session* session, const std::string& argument ){
 
   if( session->loglevel >= 3 ) (*session->logfile) << "PFL handler reached" << endl;
 
-  unsigned int resolution, x1, y1, x2, y2, width, height;
+  int resolution, x1, y1, x2, y2, width, height;
 
 
   // Time this command
@@ -81,9 +82,15 @@ void PFL::run( Session* session, const std::string& argument ){
 
 
   // Make sure we don't request impossible resolutions
-  if( resolution<0 || resolution>=(*session->image)->getNumResolutions() ){
+  if( resolution<0 || resolution>=(int)(*session->image)->getNumResolutions() ){
     ostringstream error;
     error << "PFL :: Invalid resolution number: " << resolution; 
+    throw error.str();
+  }
+  // Or impossible coordinates
+  if( x1<0 || x2<0 || y1<0 || y2<0 ){
+    ostringstream error;
+    error << "PFL :: Invalid coordinates: " << x1 << "," << y1 << "-" << x2 << "," << y2 << endl;
     throw error.str();
   }
 
@@ -136,12 +143,10 @@ void PFL::run( Session* session, const std::string& argument ){
     // Get the region of data for this wavelength and line profile
     RawTile rawtile = tilemanager.getRegion( resolution, wavelength, session->view->yangle, session->view->getLayers(), x1, y1, width, height );
 
-
     // Loop through our pixels
     for( unsigned int j=0; j<length; j++ ){
 
-      float intensity;
-      char c_intensity[24];
+      float intensity = 0.0;
       void *ptr;
 
       // Handle depending on bit depth
@@ -164,9 +169,8 @@ void PFL::run( Session* session, const std::string& argument ){
 	}
       }
 
-      //if( rawtile.sampleType == FLOATINGPOINT ) profile << fixed;
-      snprintf( c_intensity, 24, "%.9g", intensity );
-      profile << c_intensity;
+      if( rawtile.sampleType == FLOATINGPOINT ) profile << fixed << setprecision(9);
+      profile << intensity;
       if( j < length-1 ) profile << ",";
 
     }
@@ -188,10 +192,10 @@ void PFL::run( Session* session, const std::string& argument ){
   snprintf( str, 1024,
 	    "Server: iipsrv/%s\r\n"
 	    "Content-Type: application/json\r\n"
-	    "Cache-Control: max-age=%d\r\n"
 	    "Last-Modified: %s\r\n"
+	    "%s\r\n"
 	    "\r\n",
-	    VERSION, MAX_AGE, (*session->image)->getTimestamp().c_str() );
+	    VERSION, (*session->image)->getTimestamp().c_str(), session->response->getCacheControl().c_str() );
 
   session->out->printf( (const char*) str );
   session->out->flush();

@@ -102,16 +102,26 @@ void filter_rotate( RawTile& in, float angle );
 /** @param in input image */
 void filter_greyscale( RawTile& in );
 
+
 /// Apply a color twist
 /** @param in input image
 @param ctw 2D color twist matrix
 */
 void filter_twist( RawTile& in, const std::vector< std::vector<float> >& ctw );
 
+
 /// Extract bands
 /** @param in input image
-@param bands number of bands
+    @param bands number of bands
 */
 void filter_flatten( RawTile& in, int bands );
+
+
+///Flip image
+/** @param in input image
+    @param o orientation (0=horizontal,1=vertical)
+*/
+void filter_flip( RawTile& in, int o );
+
 
 #endif

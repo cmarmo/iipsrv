@@ -1,7 +1,7 @@
 /*
     IIP Environment Variable Class
 
-    Copyright (C) 2006-2013 Ruven Pillay.
+    Copyright (C) 2006-2015 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -38,7 +38,9 @@
 #define LIBMEMCACHED_SERVERS "localhost"
 #define LIBMEMCACHED_TIMEOUT 86400  // 24 hours
 #define INTERPOLATION 1
-
+#define CORS "";
+#define BASE_URL "";
+#define CACHE_CONTROL "max-age=86400"; // 24 hours
 
 
 #include <string>
@@ -212,6 +214,32 @@ class Environment {
     return interpolation;
   }
 
+
+  static std::string getCORS(){
+    char* envpara = getenv( "CORS" );
+    std::string cors;
+    if( envpara ) cors = std::string( envpara );
+    else cors = CORS;
+    return cors;
+  }
+
+
+  static std::string getBaseURL(){
+    char* envpara = getenv( "BASE_URL" );
+    std::string base_url;
+    if( envpara ) base_url = std::string( envpara );
+    else base_url = BASE_URL;
+    return base_url;
+  }
+
+
+  static std::string getCacheControl(){
+    char* envpara = getenv( "CACHE_CONTROL" );
+    std::string cache_control;
+    if( envpara ) cache_control = std::string( envpara );
+    else cache_control = CACHE_CONTROL;
+    return cache_control;
+  }
 
 };
 
