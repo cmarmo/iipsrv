@@ -143,7 +143,7 @@ void CVT::send( Session* session ){
 	    "%s\r\n"
 	    "Last-Modified: %s\r\n"
 	    "Content-Type: image/jpeg\r\n"
-	    "Content-Disposition: inline;filename=\"%s.jpg\"\r\n"
+//	    "Content-Disposition: inline;filename=\"%s.jpg\"\r\n"
 #ifdef CHUNKED
 	    "Transfer-Encoding: chunked\r\n"
 #endif
