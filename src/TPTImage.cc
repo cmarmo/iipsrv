@@ -24,9 +24,9 @@
 #include "TPTImage.h"
 #include <sstream>
 
-TIFFCacheMapType	tiffCache;
 
 using namespace std;
+
 
 void TPTImage::openImage()
 {
@@ -177,7 +177,7 @@ void TPTImage::loadImageInfo( int seq, int ang )
 void TPTImage::closeImage()
 {
   if( tiff != NULL ){
-//    TIFFClose( tiff );
+    TIFFClose( tiff );
     tiff = NULL;
   }
   if( tile_buf != NULL ){

@@ -50,6 +50,7 @@ static bool isfinite( float arg )
  */
 #define PARALLEL_THRESHOLD 65536
 
+
 static const float _sRGB[3][3] = { {  3.240479, -1.537150, -0.498535 },
 				   { -0.969256, 1.875992, 0.041556 },
 				   { 0.055648, -0.204043, 1.057311 } };
@@ -483,14 +484,28 @@ void filter_inv( RawTile& in ){
   }
 }
 
+
+
 // Resize image using nearest neighbour interpolation
 void filter_interpolate_nearestneighbour( RawTile& in, unsigned int resampled_width, unsigned int resampled_height ){
 
-  float *buf = (float*)in.data;
+  // Pointer to input buffer
+  unsigned char *input = (unsigned char*) in.data;
 
   int channels = in.channels;
   unsigned int width = in.width;
   unsigned int height = in.height;
+
+  // Pointer to output buffer
+  unsigned char *output;
+
+  // Create new buffer if size is larger than input size
+  bool new_buffer = false;
+  if( resampled_width*resampled_height > in.width*in.height ){
+    new_buffer = true;
+    output = new unsigned char[resampled_width*resampled_height*in.channels];
+  }
+  else output = (unsigned char*) in.data;
 
   // Calculate our scale
   float xscale = (float)width / (float)resampled_width;
@@ -507,29 +522,37 @@ void filter_interpolate_nearestneighbour( RawTile& in, unsigned int resampled_wi
 
       unsigned int resampled_index = (i + j*resampled_width)*channels;
       for( int k=0; k<in.channels; k++ ){
-        buf[resampled_index+k] = buf[pyramid_index+k];
+	output[resampled_index+k] = input[pyramid_index+k];
       }
     }
   }
+
+  // Delete original buffer
+  if( new_buffer ) delete[] (unsigned char*) input;
 
   // Correctly set our Rawtile info
   in.width = resampled_width;
   in.height = resampled_height;
   in.dataLength = resampled_width * resampled_height * channels * in.bpc/8;
-
+  in.data = output;
 }
+
 
 
 // Resize image using bilinear interpolation
 //  - Floating point implementation which benchmarks about 2.5x slower than nearest neighbour
 void filter_interpolate_bilinear( RawTile& in, unsigned int resampled_width, unsigned int resampled_height ){
 
-  float *buf = (float*) in.data;
+  // Pointer to input buffer
+  unsigned char *input = (unsigned char*) in.data;
 
   int channels = in.channels;
   unsigned int width = in.width;
   unsigned int height = in.height;
   unsigned long np = in.channels * in.width * in.height;
+
+  // Create new buffer and pointer for our output
+  unsigned char *output = new unsigned char[resampled_width*resampled_height*in.channels];
 
   // Calculate our scale
   float xscale = (float)(width) / (float)resampled_width;
@@ -544,8 +567,8 @@ void filter_interpolate_bilinear( RawTile& in, unsigned int resampled_width, uns
 #endif
   for( unsigned int j=0; j<resampled_height; j++ ){
 
-    // Index to the current pyramid resolution's bottom left right pixel
-    unsigned int jj = (unsigned int) floorf(j*yscale);
+    // Index to the current pyramid resolution's top left pixel
+    int jj = (int) floor( j*yscale );
 
     // Calculate some weights - do this in the highest loop possible
     float jscale = j*yscale;
@@ -554,8 +577,8 @@ void filter_interpolate_bilinear( RawTile& in, unsigned int resampled_width, uns
 
     for( unsigned int i=0; i<resampled_width; i++ ){
 
-      // Index to the current pyramid resolution's bottom left right pixel
-      unsigned int ii = (unsigned int) floorf(i*xscale);
+      // Index to the current pyramid resolution's top left pixel
+      int ii = (int) floor( i*xscale );
 
       // Calculate the indices of the 4 surrounding pixels
       unsigned int p11, p12, p21, p22;
@@ -575,30 +598,28 @@ void filter_interpolate_bilinear( RawTile& in, unsigned int resampled_width, uns
       float a = (float)(ii+1) - iscale;
       float b = iscale - (float)ii;
 
-      for( int k=0; k<in.channels; k++ ){
+      // Output buffer index
+      unsigned int resampled_index = j*resampled_width*in.channels + i*in.channels;
 
-	// If we are exactly coincident with a bounding box pixel, use that pixel value.
-	// This should only ever occur on the top left p11 pixel.
-	// Otherwise perform our full interpolation
-	if( resampled_index == p11 ){
-	  buf[resampled_index+k] = buf[p11+k];
-	}
-	else{
-            float tx = buf[p11+k]*a + buf[p21+k]*b;
-	    float ty = buf[p12+k]*a + buf[p22+k]*b;
-	    float r = (float)( c*tx + d*ty );
-	    buf[resampled_index+k] = r;
-	}
+      for( int k=0; k<in.channels; k++ ){
+	float tx = input[p11+k]*a + input[p21+k]*b;
+	float ty = input[p12+k]*a + input[p22+k]*b;
+	unsigned char r = (unsigned char)( c*tx + d*ty );
+	output[resampled_index+k] = r;
       }
     }
   }
+
+  // Delete original buffer
+  delete[] (unsigned char*) input;
 
   // Correctly set our Rawtile info
   in.width = resampled_width;
   in.height = resampled_height;
   in.dataLength = resampled_width * resampled_height * channels * in.bpc/8;
-
+  in.data = output;
 }
+
 
 
 // Function to apply a contrast adjustment and clip to 8 bit
@@ -758,6 +779,8 @@ void filter_greyscale( RawTile& rawtile ){
   rawtile.dataLength = np;
 }
 
+
+
 // Apply twist or channel recombination to colour or multi-channel image
 void filter_twist( RawTile& rawtile, const vector< vector<float> >& matrix ){
 
@@ -796,10 +819,12 @@ void filter_twist( RawTile& rawtile, const vector< vector<float> >& matrix ){
 
     // Only write our values at the end as we reuse channel values several times during the twist loops
     for( int k=0; k<rawtile.channels; k++ ) ((float*)rawtile.data)[n++] = pixel[k];
+
   }
   delete[] nrows;
   delete[] pixel;
 }
+
 
 
 // Flatten a multi-channel image to a given number of bands by simply stripping
@@ -817,7 +842,7 @@ void filter_flatten( RawTile& in, int bands ){
   // Simply loop through assigning to the same buffer
   for( unsigned long i=0; i<np; i++ ){
     for( int k=0; k<bands; k++ ){
-      ((float*)in.data)[ni++] = ((float*)in.data)[no++];
+      ((unsigned char*)in.data)[ni++] = ((unsigned char*)in.data)[no++];
     }
     no += gap;
   }
@@ -825,6 +850,9 @@ void filter_flatten( RawTile& in, int bands ){
   in.channels = bands;
   in.dataLength = ni * in.bpc/8;
 }
+
+
+
 
 // Flip image in horizontal or vertical direction (0=horizontal,1=vertical)
 void filter_flip( RawTile& rawtile, int orientation ){

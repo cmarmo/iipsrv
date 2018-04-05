@@ -192,6 +192,8 @@ void CVT::send( Session* session ){
     }
   }
 
+
+
   // Only use our floating point pipeline if necessary
   if( complete_image.bpc > 8 || session->view->floatProcessing() ){
 
@@ -202,55 +204,74 @@ void CVT::send( Session* session ){
       if( session->loglevel >= 5 ){
 	*(session->logfile) << "CVT :: Converting to floating point and normalizing in "
 			    << function_timer.getTime() << " microseconds" << endl;
-  }
+      }
+    }
 
 
-  // Apply hill shading if requested
-  if( session->view->shaded ){
-    if( session->loglevel >= 5 ) function_timer.start();
-    filter_shade( complete_image, session->view->shade[0], session->view->shade[1] );
-    if( session->loglevel >= 5 ){
+    // Apply hill shading if requested
+    if( session->view->shaded ){
+      if( session->loglevel >= 5 ) function_timer.start();
+      filter_shade( complete_image, session->view->shade[0], session->view->shade[1] );
+      if( session->loglevel >= 5 ){
 	*(session->logfile) << "CVT :: Applying hill-shading in " << function_timer.getTime() << " microseconds" << endl;
+      }
     }
-  }
 
-  // Apply color twist if requested
-  if( session->view->ctw.size() ){
-    if( session->loglevel >= 5 ) function_timer.start();
-    filter_twist( complete_image, session->view->ctw );
-    if( session->loglevel >= 5 ){
+
+    // Apply color twist if requested
+    if( session->view->ctw.size() ){
+      if( session->loglevel >= 5 ) function_timer.start();
+      filter_twist( complete_image, session->view->ctw );
+      if( session->loglevel >= 5 ){
 	*(session->logfile) << "CVT :: Applying color twist in " << function_timer.getTime() << " microseconds" << endl;
+      }
+    }
+
+
+    // Apply any gamma correction
+    if( session->view->getGamma() != 1.0 ){
+      float gamma = session->view->getGamma();
+      if( session->loglevel >= 5 ) function_timer.start();
+      filter_gamma( complete_image, gamma );
+      if( session->loglevel >= 5 ){
+	*(session->logfile) << "CVT :: Applying gamma of " << gamma << " in "
+			    << function_timer.getTime() << " microseconds" << endl;
+      }
+    }
+
+
+    // Apply inversion if requested
+    if( session->view->inverted ){
+      if( session->loglevel >= 5 ) function_timer.start();
+      filter_inv( complete_image );
+      if( session->loglevel >= 5 ){
+	*(session->logfile) << "CVT :: Applying inversion in " << function_timer.getTime() << " microseconds" << endl;
+      }
+    }
+
+
+    // Apply color mapping if requested
+    if( session->view->cmapped ){
+      if( session->loglevel >= 5 ) function_timer.start();
+      filter_cmap( complete_image, session->view->cmap );
+      if( session->loglevel >= 5 ){
+	*(session->logfile) << "CVT :: Applying color map in " << function_timer.getTime() << " microseconds" << endl;
+      }
+    }
+
+
+    // Apply any contrast adjustments and/or clip from 16bit or 32bit to 8bit
+    {
+      if( session->loglevel >= 5 ) function_timer.start();
+      filter_contrast( complete_image, session->view->getContrast() );
+      if( session->loglevel >= 5 ){
+	*(session->logfile) << "CVT :: Applying contrast of " << session->view->getContrast()
+			    << " and converting to 8bit in " << function_timer.getTime() << " microseconds" << endl;
+      }
     }
   }
 
 
-  // Reduce to 1 or 3 bands if we have an alpha channel or a multi-band image
-  if( (complete_image.channels==2) || (complete_image.channels>3 ) ){
-
-    int output_channels = (complete_image.channels==2)? 1 : 3;
-    if( session->loglevel >= 5 ) function_timer.start();
-
-    filter_flatten( complete_image, output_channels );
-
-    if( session->loglevel >= 5 ){
-      *(session->logfile) << "CVT :: Flattening to " << output_channels << " channel"
-			  << ((output_channels>1) ? "s" : "") << " in "
-			  << function_timer.getTime() << " microseconds" << endl;
-    }
-  }
-
-  // Convert to greyscale if requested
-  if( (*session->image)->getColourSpace() == sRGB && session->view->colourspace == GREYSCALE ){
-
-    if( session->loglevel >= 5 ) function_timer.start();
-
-    filter_greyscale( complete_image );
-
-    if( session->loglevel >= 5 ){
-      *(session->logfile) << "CVT :: Converting to greyscale in "
-			  << function_timer.getTime() << " microseconds" << endl;
-    }
-  }
 
   // Resize our image as requested. Use the interpolation method requested in the server configuration.
   //  - Use bilinear interpolation by default
@@ -277,45 +298,37 @@ void CVT::send( Session* session ){
     }
   }
 
-  // Apply any gamma correction
-  if( session->view->getGamma() != 1.0 ){
-    float gamma = session->view->getGamma();
+
+  // Reduce to 1 or 3 bands if we have an alpha channel or a multi-band image
+  if( (complete_image.channels==2) || (complete_image.channels>3 ) ){
+
+    int output_channels = (complete_image.channels==2)? 1 : 3;
     if( session->loglevel >= 5 ) function_timer.start();
-    filter_gamma( complete_image, gamma );
+
+    filter_flatten( complete_image, output_channels );
+
     if( session->loglevel >= 5 ){
-      *(session->logfile) << "CVT :: Applying gamma of " << gamma << " in "
-		    << function_timer.getTime() << " microseconds" << endl;
+      *(session->logfile) << "CVT :: Flattening to " << output_channels << " channel"
+			  << ((output_channels>1) ? "s" : "") << " in "
+			  << function_timer.getTime() << " microseconds" << endl;
     }
   }
 
 
-  // Apply inversion if requested
-  if( session->view->inverted ){
+
+  // Convert to greyscale if requested
+  if( (*session->image)->getColourSpace() == sRGB && session->view->colourspace == GREYSCALE ){
+
     if( session->loglevel >= 5 ) function_timer.start();
-    filter_inv( complete_image );
+
+    filter_greyscale( complete_image );
+
     if( session->loglevel >= 5 ){
-      *(session->logfile) << "CVT :: Applying inversion in " << function_timer.getTime() << " microseconds" << endl;
+      *(session->logfile) << "CVT :: Converting to greyscale in "
+			  << function_timer.getTime() << " microseconds" << endl;
     }
   }
 
-
-  // Apply color mapping if requested
-  if( session->view->cmapped ){
-    if( session->loglevel >= 5 ) function_timer.start();
-    filter_cmap( complete_image, session->view->cmap );
-    if( session->loglevel >= 5 ){
-      *(session->logfile) << "CVT :: Applying color map in " << function_timer.getTime() << " microseconds" << endl;
-    }
-  }
-
-
-  // Apply any contrast adjustments and/or clip from 16bit or 32bit to 8bit
-  if( session->loglevel >= 5 ) function_timer.start();
-  filter_contrast( complete_image, session->view->getContrast() );
-  if( session->loglevel >= 5 ){
-	*(session->logfile) << "CVT :: Applying contrast of " << session->view->getContrast()
-	<< " and converting to 8bit in " << function_timer.getTime() << " microseconds" << endl;
-  }
 
 
   // Apply flip

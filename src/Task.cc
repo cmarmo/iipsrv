@@ -408,6 +408,7 @@ void LYR::run( Session* session, const string& argument ){
 
 }
 
+
 void CTW::run( Session* session, const string& argument ){
 
   /* Matrices should be formatted as CTW=[a,b,c;d,e,f;g,h,i] where commas separate row values
@@ -458,5 +459,5 @@ void CTW::run( Session* session, const string& argument ){
       *(session->logfile) << endl;
     }
   }
-}
 
+}

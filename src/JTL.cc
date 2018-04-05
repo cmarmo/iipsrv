@@ -71,7 +71,6 @@ void JTL::send( Session* session, int resolution, int tile ){
 
   TileManager tilemanager( session->tileCache, *session->image, session->watermark, session->jpeg, session->logfile, session->loglevel );
 
-  // Setting compression type to UNCOMPRESSED to force all image types to go through normalization
   CompressionType ct;
 
   // Request uncompressed tile if raw pixel data is required for processing
@@ -83,6 +82,7 @@ void JTL::send( Session* session, int resolution, int tile ){
       || session->view->getRotation() != 0.0 || session->view->flip != 0
       ) ct = UNCOMPRESSED;
   else ct = JPEG;
+
 
   // Embed ICC profile
   if( session->view->embedICC() && ((*session->image)->getMetadata("icc").size()>0) ){
@@ -121,79 +121,63 @@ void JTL::send( Session* session, int resolution, int tile ){
     }
   }
 
+
   // Only use our float pipeline if necessary
   if( rawtile.bpc > 8 || session->view->floatProcessing() ){
 
-  // Apply hill shading if requested
-  if( session->view->shaded ){
+    // Apply normalization and float conversion
     if( session->loglevel >= 4 ){
-      *(session->logfile) << "JTL :: Applying hill-shading";
+      *(session->logfile) << "JTL :: Normalizing and converting to float";
       function_timer.start();
     }
-    filter_shade( rawtile, session->view->shade[0], session->view->shade[1] );
+    filter_normalize( rawtile, (*session->image)->max, (*session->image)->min );
     if( session->loglevel >= 4 ){
       *(session->logfile) << " in " << function_timer.getTime() << " microseconds" << endl;
     }
-  }
 
 
-  // Apply color twist if requested
-  if( session->view->ctw.size() ){
-    if( session->loglevel >= 4 ){
-      *(session->logfile) << "JTL :: Applying color twist";
-      function_timer.start();
+    // Apply hill shading if requested
+    if( session->view->shaded ){
+      if( session->loglevel >= 4 ){
+	*(session->logfile) << "JTL :: Applying hill-shading";
+	function_timer.start();
+      }
+      filter_shade( rawtile, session->view->shade[0], session->view->shade[1] );
+      if( session->loglevel >= 4 ){
+	*(session->logfile) << " in " << function_timer.getTime() << " microseconds" << endl;
+      }
     }
-    filter_twist( rawtile, session->view->ctw );
-    if( session->loglevel >= 4 ){
-      *(session->logfile) << " in " << function_timer.getTime() << " microseconds" << endl;
+
+
+    // Apply color twist if requested
+    if( session->view->ctw.size() ){
+      if( session->loglevel >= 4 ){
+	*(session->logfile) << "JTL :: Applying color twist";
+	function_timer.start();
+      }
+      filter_twist( rawtile, session->view->ctw );
+      if( session->loglevel >= 4 ){
+	*(session->logfile) << " in " << function_timer.getTime() << " microseconds" << endl;
+      }
     }
-  }
 
 
-  // Reduce to 1 or 3 bands if we have an alpha channel or a multi-band image
-  
-  if( rawtile.channels == 2 || rawtile.channels > 3 ){
-    unsigned int bands = (rawtile.channels==2) ? 1 : 3;
-    if( session->loglevel >= 4 ){
-      *(session->logfile) << "JTL :: Flattening channels to " << bands;
-      function_timer.start();
+    // Apply any gamma correction
+    if( session->view->getGamma() != 1.0 ){
+      float gamma = session->view->getGamma();
+      if( session->loglevel >= 4 ){
+	*(session->logfile) << "JTL :: Applying gamma of " << gamma;
+	function_timer.start();
+      }
+      filter_gamma( rawtile, gamma);
+      if( session->loglevel >= 4 ){
+	*(session->logfile) << " in " << function_timer.getTime() << " microseconds" << endl;
+      }
     }
-    filter_flatten( rawtile, bands );
-    if( session->loglevel >= 4 ){
-      *(session->logfile) << " in " << function_timer.getTime() << " microseconds" << endl;
-    }
-  }
 
 
-  // Convert to greyscale if requested
-  if( (*session->image)->getColourSpace() == sRGB && session->view->colourspace == GREYSCALE ){
-    if( session->loglevel >= 4 ){
-      *(session->logfile) << "JTL :: Converting to greyscale";
-      function_timer.start();
-    }
-    filter_greyscale( rawtile );
-    if( session->loglevel >= 4 ){
-      *(session->logfile) << " in " << function_timer.getTime() << " microseconds" << endl;
-    }
-  }
-
-
-  // Apply any gamma correction
-  if( session->view->getGamma() != 1.0 ){
-    float gamma = session->view->getGamma();
-    if( session->loglevel >= 4 ){
-      *(session->logfile) << "JTL :: Applying gamma of " << gamma;
-      function_timer.start();
-    }
-    filter_gamma( rawtile, gamma);
-    if( session->loglevel >= 4 ){
-      *(session->logfile) << " in " << function_timer.getTime() << " microseconds" << endl;
-    }
-  }
-
-
-  // Apply inversion if requested
-  if( session->view->inverted ){
+    // Apply inversion if requested
+    if( session->view->inverted ){
       if( session->loglevel >= 4 ){
 	*(session->logfile) << "JTL :: Applying inversion";
 	function_timer.start();
@@ -228,6 +212,35 @@ void JTL::send( Session* session, int resolution, int tile ){
     if( session->loglevel >= 4 ){
       *(session->logfile) << " in " << function_timer.getTime() << " microseconds" << endl;
     }
+
+  }
+
+
+  // Reduce to 1 or 3 bands if we have an alpha channel or a multi-band image
+  if( rawtile.channels == 2 || rawtile.channels > 3 ){
+    unsigned int bands = (rawtile.channels==2) ? 1 : 3;
+    if( session->loglevel >= 4 ){
+      *(session->logfile) << "JTL :: Flattening channels to " << bands;
+      function_timer.start();
+    }
+    filter_flatten( rawtile, bands );
+    if( session->loglevel >= 4 ){
+      *(session->logfile) << " in " << function_timer.getTime() << " microseconds" << endl;
+    }
+  }
+
+
+  // Convert to greyscale if requested
+  if( (*session->image)->getColourSpace() == sRGB && session->view->colourspace == GREYSCALE ){
+    if( session->loglevel >= 4 ){
+      *(session->logfile) << "JTL :: Converting to greyscale";
+      function_timer.start();
+    }
+    filter_greyscale( rawtile );
+    if( session->loglevel >= 4 ){
+      *(session->logfile) << " in " << function_timer.getTime() << " microseconds" << endl;
+    }
+  }
 
 
   // Apply flip
