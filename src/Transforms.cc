@@ -2,7 +2,7 @@
 
 /*  IIP fcgi server module - image processing routines
 
-    Copyright (C) 2004-2015 Ruven Pillay.
+    Copyright (C) 2004-2017 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -87,7 +87,11 @@ void filter_normalize( RawTile& in, vector<float>& max, vector<float>& min ) {
     if( in.bpc == 32 && in.sampleType == FLOATINGPOINT ) {
       fptr = (float*)in.data;
       // Loop through our pixels for floating point pixels
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#elif defined(_OPENMP)
+#pragma omp parallel for
+#endif
       for( unsigned int n=c; n<np; n+=nc ){
         normdata[n] = isfinite(fptr[n])? (fptr[n] - minc) * invdiffc : 0.0;
       }
@@ -95,7 +99,11 @@ void filter_normalize( RawTile& in, vector<float>& max, vector<float>& min ) {
     else if( in.bpc == 32 && in.sampleType == FIXEDPOINT ) {
       uiptr = (unsigned int*)in.data;
       // Loop through our pixels for unsigned int pixels
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#elif defined(_OPENMP)
+#pragma omp parallel for
+#endif
       for( unsigned int n=c; n<np; n+=nc ){
         normdata[n] = (uiptr[n] - minc) * invdiffc;
       }
@@ -103,7 +111,11 @@ void filter_normalize( RawTile& in, vector<float>& max, vector<float>& min ) {
     else if( in.bpc == 16 ) {
       usptr = (unsigned short*)in.data;
       // Loop through our unsigned short pixels
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#elif defined(_OPENMP)
+#pragma omp parallel for
+#endif
       for( unsigned int n=c; n<np; n+=nc ){
         normdata[n] = (usptr[n] - minc) * invdiffc;
       }
@@ -111,7 +123,11 @@ void filter_normalize( RawTile& in, vector<float>& max, vector<float>& min ) {
     else {
       ucptr = (unsigned char*)in.data;
       // Loop through our unsigned char pixels
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#elif defined(_OPENMP)
+#pragma omp parallel for
+#endif
       for( unsigned int n=c; n<np; n+=nc ){
         normdata[n] = (ucptr[n] - minc) * invdiffc;
       }
@@ -171,7 +187,11 @@ void filter_shade( RawTile& in, int h_angle, int v_angle ){
   buffer = new float[ndata];
 
 
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#elif defined(_OPENMP)
+#pragma omp parallel for
+#endif
   for( unsigned int k=0; k<ndata; k++ ){
 
     unsigned int n = k*3;
@@ -301,7 +321,12 @@ void filter_LAB2sRGB( RawTile& in ){
 
   unsigned long np = in.width * in.height * in.channels;
 
+  // Parallelize code using OpenMP
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#elif defined(_OPENMP)
+#pragma omp parallel for
+#endif
   for( unsigned long n=0; n<np; n+=in.channels ){
     unsigned char* ptr = (unsigned char*) in.data;
     unsigned char q[3];
@@ -330,8 +355,11 @@ void filter_cmap( RawTile& in, enum cmap_type cmap ){
   float *outv = outptr;
 
   switch(cmap){
+
     case HOT:
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
       for( int unsigned n=0; n<ndata; n+=in_chan, outv+=3 ){
         value = fptr[n];
         if(value>1.)
@@ -347,8 +375,11 @@ void filter_cmap( RawTile& in, enum cmap_type cmap ){
         else { outv[0]=outv[1]=outv[2]=1.; }
       }
       break;
+
     case COLD:
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
       for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ){
         value = fptr[n];
         if(value>1.)
@@ -364,8 +395,11 @@ void filter_cmap( RawTile& in, enum cmap_type cmap ){
         else {outv[0]=outv[1]=outv[2]=1.;}
       }
       break;
+
     case JET:
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
       for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ){
         value = fptr[n];
         if(value<0.)
@@ -383,10 +417,44 @@ void filter_cmap( RawTile& in, enum cmap_type cmap ){
         else { outv[0]=0.5; outv[1]=outv[2]=0.; }
       }
       break;
+
+    case RED:
+#if defined(__ICC) || defined(__INTEL_COMPILER)
+#pragma ivdep
+#endif
+      for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ){
+	value = fptr[n];
+	outv[0] = value;
+	outv[1] = outv[2] = 0.;
+      }
+      break;
+
+    case GREEN:
+#if defined(__ICC) || defined(__INTEL_COMPILER)
+#pragma ivdep
+#endif
+      for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ) {
+	value = fptr[n];
+	outv[0] = outv[2] = 0.;
+	outv[1] = value;
+      }
+      break;
+
+    case BLUE:
+#if defined(__ICC) || defined(__INTEL_COMPILER)
+#pragma ivdep
+#endif
+      for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ) {
+	value = fptr[n];
+	outv[0] = outv[1] = 0;
+	outv[2] = value;
+      }
+      break;
+
     default:
       break;
-    };
 
+  };
 
   // Delete old data buffer
   delete[] (float*) in.data;
@@ -404,7 +472,11 @@ void filter_inv( RawTile& in ){
   float *infptr = (float*) in.data;
 
   // Loop through our pixels for floating values
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#elif defined(_OPENMP)
+#pragma omp parallel for
+#endif
   for( unsigned int n=0; n<np; n++ ){
     float v = infptr[n];
     infptr[n] = 1.0 - v;
@@ -457,11 +529,19 @@ void filter_interpolate_bilinear( RawTile& in, unsigned int resampled_width, uns
   int channels = in.channels;
   unsigned int width = in.width;
   unsigned int height = in.height;
+  unsigned long np = in.channels * in.width * in.height;
 
   // Calculate our scale
-  float xscale = (float)width / (float)resampled_width;
-  float yscale = (float)height / (float)resampled_height;
+  float xscale = (float)(width) / (float)resampled_width;
+  float yscale = (float)(height) / (float)resampled_height;
 
+
+  // Do not parallelize for small images (256x256 pixels) as this can be slower that single threaded
+#if defined(__ICC) || defined(__INTEL_COMPILER)
+#pragma ivdep
+#elif defined(_OPENMP)
+#pragma omp parallel for if( resampled_width*resampled_height > PARALLEL_THRESHOLD )
+#endif
   for( unsigned int j=0; j<resampled_height; j++ ){
 
     // Index to the current pyramid resolution's bottom left right pixel
@@ -478,11 +558,17 @@ void filter_interpolate_bilinear( RawTile& in, unsigned int resampled_width, uns
       unsigned int ii = (unsigned int) floorf(i*xscale);
 
       // Calculate the indices of the 4 surrounding pixels
-      unsigned int p11 = (unsigned int) ( channels * ( ii + jj*width ) );
-      unsigned int p12 = (unsigned int) ( channels * ( ii + (jj+1)*width ) );
-      unsigned int p21 = (unsigned int) ( channels * ( (ii+1) + jj*width ) );
-      unsigned int p22 = (unsigned int) ( channels * ( (ii+1) + (jj+1)*width ) );
-      unsigned int resampled_index = ((i + j*resampled_width) * channels);
+      unsigned int p11, p12, p21, p22;
+      unsigned long jj_w = jj*width;
+      p11 = (unsigned int) ( channels * ( ii + jj_w ) );
+      p12 = (unsigned int) ( channels * ( ii + (jj_w+width) ) );
+      p21 = (unsigned int) ( channels * ( (ii+1) + jj_w ) );
+      p22 = (unsigned int) ( channels * ( (ii+1) + (jj_w+width) ) );
+
+      // Make sure we don't stray outside our input buffer boundary
+      // - use replication at the edge
+      p12 = (p12<=np)? p12 : np-channels;
+      p22 = (p22<=np)? p22 : np-channels;
 
       // Calculate the rest of our weights
       float iscale = i*xscale;
@@ -518,12 +604,16 @@ void filter_interpolate_bilinear( RawTile& in, unsigned int resampled_width, uns
 // Function to apply a contrast adjustment and clip to 8 bit
 void filter_contrast( RawTile& in, float c ){
 
-  unsigned int np = in.dataLength * 8 / in.bpc;
+  unsigned long np = in.width * in.height * in.channels;
   unsigned char* buffer = new unsigned char[np];
   float* infptr = (float*)in.data;
 
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-  for( unsigned int n=0; n<np; n++ ){
+#elif defined(_OPENMP)
+#pragma omp parallel for
+#endif
+  for( unsigned long n=0; n<np; n++ ){
     float v = infptr[n] * 255.0 * c;
     buffer[n] = (unsigned char)( (v<255.0) ? (v<0.0? 0.0 : v) : 255.0 );
   }
@@ -546,7 +636,11 @@ void filter_gamma( RawTile& in, float g ){
   float* infptr = (float*)in.data;
 
   // Loop through our pixels for floating values
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#elif defined(_OPENMP)
+#pragma omp parallel for
+#endif
   for( unsigned int n=0; n<np; n++ ){
     float v = infptr[n];
     infptr[n] = powf( v<0.0 ? 0.0 : v, g );
@@ -569,7 +663,11 @@ void filter_rotate( RawTile& in, float angle=0.0 ){
 
     // Rotate 90
     if( (int) angle % 360 == 90 ){
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#elif defined(_OPENMP)
+#pragma omp parallel for if( in.width*in.height > PARALLEL_THRESHOLD )
+#endif
       for( unsigned int i=0; i < in.width; i++ ){
 	unsigned int n = i*in.height*in.channels;
 	for( int j=in.height-1; j>=0; j-- ){
@@ -583,10 +681,14 @@ void filter_rotate( RawTile& in, float angle=0.0 ){
 
     // Rotate 270
     else if( (int) angle % 360 == 270 ){
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#elif defined(_OPENMP)
+#pragma omp parallel for if( in.width*in.height > PARALLEL_THRESHOLD )
+#endif
       for( int i=in.width-1; i>=0; i-- ){
-	unsigned int n = i*in.height*in.channels;
-	for( unsigned int j=0; j < in.height; j++ ){
+	unsigned int n = (in.width-1-i)*in.height*in.channels;
+	for( unsigned int j=0; j<in.height; j++ ){
 	  unsigned int index = (in.width*j + i)*in.channels;
 	  for( int k=0; k < in.channels; k++ ){
 	    ((unsigned char*)buffer)[n++] = ((unsigned char*)in.data)[index+k];
@@ -600,7 +702,7 @@ void filter_rotate( RawTile& in, float angle=0.0 ){
       for( int i=(in.width*in.height)-1; i >= 0; i-- ){
 	unsigned index = i * in.channels;
 	for( int k=0; k < in.channels; k++ ){
-	  ((unsigned char*)buffer)[n++]  = ((unsigned char*)in.data)[index+k];
+	  ((unsigned char*)buffer)[n++] = ((unsigned char*)in.data)[index+k];
 	}
       }
     }
@@ -634,7 +736,11 @@ void filter_greyscale( RawTile& rawtile ){
 
   // Calculate using fixed-point arithmetic
   //  - benchmarks to around 25% faster than floating point
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#elif defined(_OPENMP)
+#pragma omp parallel for if( rawtile.width*rawtile.height > PARALLEL_THRESHOLD )
+#endif
   for( unsigned int i=0; i<np; i++ ){
     unsigned int n = i*rawtile.channels;
     unsigned char R = ((unsigned char*)rawtile.data)[n++];
@@ -720,16 +826,18 @@ void filter_flatten( RawTile& in, int bands ){
   in.dataLength = ni * in.bpc/8;
 }
 
-
 // Flip image in horizontal or vertical direction (0=horizontal,1=vertical)
 void filter_flip( RawTile& rawtile, int orientation ){
 
   unsigned char* buffer = new unsigned char[rawtile.width * rawtile.height * rawtile.channels];
-  unsigned long n = 0;
 
   // Vertical
   if( orientation == 2 ){
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#elif defined(_OPENMP)
+#pragma omp parallel for if( rawtile.width*rawtile.height > PARALLEL_THRESHOLD )
+#endif
     for( int j=rawtile.height-1; j>=0; j-- ){
       unsigned long n = j*rawtile.width*rawtile.channels;
       for( unsigned int i=0; i<rawtile.width; i++ ){
@@ -742,7 +850,11 @@ void filter_flip( RawTile& rawtile, int orientation ){
   }
   // Horizontal
   else{
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#elif defined(_OPENMP)
+#pragma omp parallel for if( rawtile.width*rawtile.height > PARALLEL_THRESHOLD )
+#endif
     for( unsigned int j=0; j<rawtile.height; j++ ){
       unsigned long n = j*rawtile.width*rawtile.channels;
       for( int i=rawtile.width-1; i>=0; i-- ){

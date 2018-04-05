@@ -1,7 +1,7 @@
 /*
     IIP JTL Command Handler Class Member Function
 
-    Copyright (C) 2006-2015 Ruven Pillay.
+    Copyright (C) 2006-2016 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -29,9 +29,14 @@ using namespace std;
 
 void JTL::send( Session* session, int resolution, int tile ){
 
+  Timer function_timer;
+  
   if( session->loglevel >= 3 ) (*session->logfile) << "JTL handler reached" << endl;
 
-  Timer function_timer;
+
+  // Make sure we have set our image
+  this->session = session;
+  checkImage();
 
 
   // Time this command
@@ -63,11 +68,31 @@ void JTL::send( Session* session, int resolution, int tile ){
     throw error.str();
   }
 
+
   TileManager tilemanager( session->tileCache, *session->image, session->watermark, session->jpeg, session->logfile, session->loglevel );
 
   // Setting compression type to UNCOMPRESSED to force all image types to go through normalization
   CompressionType ct;
-  ct = UNCOMPRESSED;
+
+  // Request uncompressed tile if raw pixel data is required for processing
+  if( (*session->image)->getNumBitsPerPixel() > 8 || (*session->image)->getColourSpace() == CIELAB
+      || (*session->image)->getNumChannels() == 2 || (*session->image)->getNumChannels() > 3
+      || ( session->view->colourspace==GREYSCALE && (*session->image)->getNumChannels()==3 &&
+	   (*session->image)->getNumBitsPerPixel()==8 )
+      || session->view->floatProcessing()
+      || session->view->getRotation() != 0.0 || session->view->flip != 0
+      ) ct = UNCOMPRESSED;
+  else ct = JPEG;
+
+  // Embed ICC profile
+  if( session->view->embedICC() && ((*session->image)->getMetadata("icc").size()>0) ){
+    if( session->loglevel >= 3 ){
+      *(session->logfile) << "JTL :: Embedding ICC profile with size "
+			  << (*session->image)->getMetadata("icc").size() << " bytes" << endl;
+    }
+    session->jpeg->setICCProfile( (*session->image)->getMetadata("icc") );
+  }
+
 
   RawTile rawtile = tilemanager.getTile( resolution, tile, session->view->xangle,
 					 session->view->yangle, session->view->getLayers(), ct );
@@ -96,17 +121,8 @@ void JTL::send( Session* session, int resolution, int tile ){
     }
   }
 
-
-  // Apply normalization and float conversion
-  if( session->loglevel >= 4 ){
-    *(session->logfile) << "JTL :: Normalizing and converting to float";
-    function_timer.start();
-  }
-  filter_normalize( rawtile, (*session->image)->max, (*session->image)->min );
-  if( session->loglevel >= 4 ){
-    *(session->logfile) << " in " << function_timer.getTime() << " microseconds" << endl;
-  }
-
+  // Only use our float pipeline if necessary
+  if( rawtile.bpc > 8 || session->view->floatProcessing() ){
 
   // Apply hill shading if requested
   if( session->view->shaded ){
