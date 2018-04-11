@@ -1,9 +1,14 @@
 language: cpp
 
+os:
+  - linux
+  - osx
+
 compiler:
   - clang
   - gcc
 
 script:
   - ./autogen.sh
-  - ./configure && make
+- ./configure && make
+

@@ -1,3 +1,207 @@
+18/12/2017:
+	- Added missing snprintf definition for Windows in JPEGCompressor.h
+
+
+14/12/2017:
+	- Added the "max" parameter for the size section to the IIIF parser ahead of
+	  deprecation in IIIF version 3.0: http://iiif.io/api/image/2.1/#size
+	- Fixed some spelling mistakes in various files - thanks to Stefan Weil
+
+
+13/12/2017:
+	- Update to configure.ac to fix compilation with Kakadu 7.10
+
+
+28/11/2017:
+	- Modified bilinear interpolation code to avoid risk of unallocated buffer
+	  reads at edges and to use replicated pixels.
+
+
+26/11/2017:
+	- Removed exception specifications from the IIPImage and Compressor class
+	  declarations as well as from their derived classes. Dynamic exception
+	  specifications are deprecated in C++11 onwards. See for rationale and details:
+	  http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2010/n3051.html
+
+
+25/11/2017:
+	- Added missing RED, GREEN and BLUE colormap implementations to Transforms.cc
+
+
+24/11/2017:
+	- Added input validation for SPECTRA, PFL and MINMAX commands to avoid
+	  possible access to unmapped memory - thanks to John Heasman at DocuSign.
+
+
+17/11/2017:
+	- Added a check to KakaduImage.cc for zero-sized regions
+
+
+04/10/2017:
+	- Set an upper size limit to ICC profiles accepted for embedding
+
+
+04/08/2017:
+	- Increased JPEG buffer size to handle large markers such as XMP metadata.
+	- XMP metadata size now reported in CVT.cc.
+
+
+14/07/2017:
+	- Added Compressor class from which JPEGCompressor is now derived.
+	  Abstracting this will enable easier integration of PNG output.
+	  Output format now specified in View class.
+
+
+06/07/2017:
+	- Enabled CORS for error responses.
+
+
+05/07/2017:
+	- Added "Access-Control-Allow-Headers" field if CORS has been set to
+	  fix CORS Ajax problems with js libraries such as JQuery, Mootools.
+
+
+02/07/2017:
+	- Added OpenMP threading info to startup in Main.cc.
+
+
+30/06/2017:
+	- Added ICC profile embedding support in JPEGCompressor for both JTL
+	  and CVT commands using an implementation based on IJG's iccjpeg.
+	  TPTImage and KakaduImage now extract the profile into the metadata map.
+	  Added also new EMBED_ICC environment variable to allow user to disable
+	  embedding. Thanks to Dave Beaudet for initial implementation.
+	- Refactored XMP metadata handling within JPEG.
+
+
+23/06/2017:
+	- Added new OBJ metadata request for IIP protocol to return full list
+	  of existing image resolutions.
+
+
+19/06/2017:
+	- Modified URI_MAP to parse this prefix first and only if not present,
+	  to use the query string. This allows query strings to be appended for
+	  caching purposes etc.
+
+
+14/06/2017:
+	- Added URI_MAP environment variable to enable mapping of URL prefixes
+	  to specific protocol handlers without requiring web server rewriting.
+	- Added missing checkImage() function to JTL and harmonized with CVT.cc.
+
+
+12/06/2017:
+	- Added try block to avoid crashes with malformed images in older
+	  versions of Kakadu.
+
+
+05/04/2017:
+	- Fixed crash in KakaduImage.cc when zero sized images are requested
+
+
+29/03/2017:
+	- Fixed scaling factor for bilinear interpolation in Transforms.cc
+
+
+02/03/2017:
+	- Added extra conditions to JTL uncompressed tile request and slightly
+	  refactored code to fix bug when greyscale conversion requested
+
+
+08/02/2017:
+	- Extra try/catch in KakaduImage for images with missing codestreams
+
+
+29/11/2016:
+	- Another update to IIIF aspect ratio code
+
+
+28/11/2016:
+	- Update to aspect ratio code for sizes exceeding max CVT limit
+
+
+18/11/2016:
+	- Modified IIIF.cc to respect aspect ratio when only width or height size
+	  parameter is given and size exceeds server max CVT limit.
+
+
+16/10/2016:
+	- Added IIIF 2.1 square region support
+
+
+29/08/2016:
+	- Fix to bug in rotation code for 270 degs introduced when parallelization added.
+	- Added test for pkg-config to configure.ac script.
+
+
+10/08/2016:
+	- Update to configure.ac script for OpenJPEG
+
+
+04/08/2016:
+	- Fix to info.json code in IIIF.cc to avoid problems with images containing only
+	  one resolution level.
+	- Fixed bug in filter_contrast() due to incorrectly calculated buffer size.
+
+
+08/07/2016:
+	- Removed "gray" from IIIF list of supported features - already specified in the
+	  qualities list.
+
+
+07/06/2016:
+	- Added fix for API change in get_colour_mapping() function in Kakadu version 7.8
+
+
+02/06/2016:
+	- Type change of counter in filter_contrast to long to avoid overflows with large
+	  image exports.
+
+
+22/03/2016: Version 1.0 Released
+
+
+08/03/2016:
+	- Added sizes field to IIIF JSON responses giving list of exportable pyramid sizes
+	  smaller than MAX_CVT.
+
+
+29/02/2016:
+	- Added support for 1 bit bilevel TIFF
+
+
+11/02/2016:
+	- Added backlog parameter support for command line use through --backlog parameter.
+	- Fixed several more Coverity scan warnings.
+
+
+29/01/2016:
+	- Minor update to IIPImage.cc to reduce risk of race condition in stat -> fopen calls
+
+
+28/01/2016:
+	- Added ifdefs to Transform.cc to enforce either ivdep for icc or openmp for gcc
+
+
+15/01/2016:
+	- Fixed a series of minor issues identified by Coverity scan
+
+
+12/01/2016:
+	- Added check to JPEGCompressor to reject images that are not 8 bits per channel
+	- Added new floatProcessing() function to View.h to simplify code in JTL and CVT
+
+
+06/01/2016:
+	- Added extra parameter check for incoherent region sizes for IIIF protocol
+21/12/2015:
+	- Fixed infinite loop in View::calculateResolution if requested size = 0. Set
+	  minimum output size to 1px.
+
+
+07/09/2015:
+	- Fixed isfinite autoconf macro in acinclude.m4 to force float type
 06/08/2015:
 	- Added timestamp check and metadata reload for images that have been modified
 	- Added X-Powered-By header as a number of web servers strip out the Server header
