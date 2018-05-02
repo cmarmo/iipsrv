@@ -98,8 +98,9 @@ string IIPResponse::formatResponse() {
    */
   string response;
   if( error.length() ){
-    response = server + eof + "Cache-Control: no-cache" + eof + mimeType + eof +
-      "Status: 400 Bad Request" + eof +
+    response = server + eof + "Cache-Control: no-cache" + eof + mimeType + eof;
+    if( !cors.empty() ) response += cors + eof;
+    response += "Status: 400 Bad Request" + eof +
       "Content-Disposition: inline;filename=\"IIPisAMadGameClosedToOurUnderstanding.netfpx\"" +
       eof + eof + error;
   }

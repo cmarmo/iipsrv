@@ -3,7 +3,7 @@
 
 /*  IIP fcgi server module
 
-    Copyright (C) 2000-2015 Ruven Pillay.
+    Copyright (C) 2000-2018 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -77,27 +77,30 @@ void IIPImage::swap( IIPImage& first, IIPImage& second ) // nothrow
 
 
 
-void IIPImage::testImageType() throw(file_error)
+void IIPImage::testImageType()
 {
   // Check whether it is a regular file
   struct stat sb;
 
   string path = fileSystemPrefix + imagePath;
+  const char *pstr = path.c_str();
+
 
   if( (stat(path.c_str(),&sb)==0) && S_ISREG(sb.st_mode) ){
 
-    isFile = true;
-    timestamp = sb.st_mtime;
-
-    // Determine our file format using magic file signatures
     unsigned char header[10];
+
+    // Immediately open our file to reduce (but not eliminate) TOCTOU race condition risks
+    // We should really use open() before fstat() but it's not supported on Windows and
+    // fopen will in any case complain if file no longer readable
     FILE *im = fopen( path.c_str(), "rb" );
     if( im == NULL ){
       string message = "Unable to open file '" + path + "'";
       throw file_error( message );
     }
 
-    // Read and close immediately
+    // Determine our file format using magic file signatures -
+    // read in 10 bytes and immediately close file
     int len = fread( header, 1, 10, im );
     fclose( im );
 
@@ -106,6 +109,9 @@ void IIPImage::testImageType() throw(file_error)
       string message = "Unable to read initial byte sequence from file '" + path + "'";
       throw file_error( message );
     }
+
+    isFile = true;
+    timestamp = sb.st_mtime;
 
     // Magic file signature for JPEG2000
     unsigned char j2k[10] = {0x00,0x00,0x00,0x0C,0x6A,0x50,0x20,0x20,0x0D,0x0A};
@@ -172,7 +178,7 @@ void IIPImage::testImageType() throw(file_error)
 
 
 
-void IIPImage::updateTimestamp( const string& path ) throw(file_error)
+void IIPImage::updateTimestamp( const string& path )
 {
   // Get a modification time for our image
   struct stat sb;
@@ -324,5 +330,3 @@ int operator != ( const IIPImage& A, const IIPImage& B )
   if( A.imagePath != B.imagePath ) return( 1 );
   else return( 0 );
 }
-
-

@@ -1,7 +1,7 @@
 /*
     IIP Response Handler Class
 
-    Copyright (C) 2003-2015 Ruven Pillay.
+    Copyright (C) 2003-2018 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@
 #endif
 
 // Fix missing snprintf in Windows
-#if _MSC_VER
+#if defined _MSC_VER && _MSC_VER<1900
 #define snprintf _snprintf
 #endif
 
@@ -112,7 +112,12 @@ class IIPResponse{
 
   /// Set CORS setting
   /** @param cors setting */
-  void setCORS( const std::string& c ){ if(!c.empty()) cors = "Access-Control-Allow-Origin: " + c; };
+  void setCORS( const std::string& c ){
+    if(!c.empty()){
+      cors = "Access-Control-Allow-Origin: " + c + eof +
+	"Access-Control-Allow-Headers: X-Requested-With";
+    }
+  };
 
 
   /// Get CORS setting
@@ -156,7 +161,7 @@ class IIPResponse{
 
   /// Display our advertising banner ;-)
   /** @param version server version */
-  std::string getAdvert( const std::string& version );
+  std::string getAdvert();
 
 
 };
