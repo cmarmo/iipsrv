@@ -1,7 +1,7 @@
 /*
     IIP CVT Command Handler Class Member Function
 
-    Copyright (C) 2006-2015 Ruven Pillay.
+    Copyright (C) 2006-2017 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -32,17 +32,25 @@ using namespace std;
 
 void CVT::send( Session* session ){
 
-  if( session->loglevel >= 2 ) *(session->logfile) << "CVT handler reached" << endl;
-
   Timer function_timer;
 
 
+  if( session->loglevel >= 2 ) *(session->logfile) << "CVT handler reached" << endl;
+
+
+  // Make sure we have set our image
   this->session = session;
   checkImage();
 
 
   // Time this command
   if( session->loglevel >= 2 ) command_timer.start();
+
+
+  // Set up our output format handler
+  Compressor *compressor = NULL;
+  if( session->view->output_format == JPEG ) compressor = session->jpeg;
+  else return;
 
 
   // Reload info in case we are dealing with a sequence
@@ -103,21 +111,30 @@ void CVT::send( Session* session ){
   }
 
 
+  // If we have requested that upscaling of images be prevented adjust requested size accordingly
+  // N.B. im_width and height here are from the requested resolution and not the max resolution
+  if( !session->view->allow_upscaling ){
+    if(resampled_width > im_width) resampled_width = im_width;
+    if(resampled_height > im_height) resampled_height = im_height;
+  }
+
   // If we have requested that the aspect ratio be maintained, make sure the final image fits *within* the requested size
+  // Don't adjust images if we have less than 0.5% difference as this is often due to rounding in resolution levels
   if( session->view->maintain_aspect ){
-    if( ((float)resampled_height/(float)view_height) > ((float)resampled_width/(float)view_width) ){
-      resampled_height = (unsigned int) round((((float)resampled_width/(float)view_width) * view_height));
+    float ratio = ((float)resampled_width/(float)view_width) / ((float)resampled_height/(float)view_height);
+    if( ratio < 0.995 ){
+      resampled_height = (unsigned int) round((((float)resampled_width/(float)view_width) * (float)view_height));
     }
-    else if( ((float)resampled_width/(float)view_width) > ((float)resampled_height/(float)view_height) ){
-      resampled_width = (unsigned int) round((((float)resampled_height/(float)view_height) * view_width));
+    else if( ratio > 1.005 ){
+      resampled_width = (unsigned int) round((((float)resampled_height/(float)view_height) * (float)view_width));
     }
   }
 
 
   if( session->loglevel >= 3 ){
     *(session->logfile) << "CVT :: Requested scaled region size is " << resampled_width << "x" << resampled_height
-			<< " at resolution " << requested_res
-			<< ". Nearest existing resolution is " << view_width << "x" << view_height << endl;
+			<< ". Nearest existing resolution is " << requested_res
+			<< " which has region with size " << view_width << "x" << view_height << endl;
   }
 
 
@@ -142,20 +159,22 @@ void CVT::send( Session* session ){
 	    "X-Powered-By: IIPImage\r\n"
 	    "%s\r\n"
 	    "Last-Modified: %s\r\n"
-	    "Content-Type: image/jpeg\r\n"
-//	    "Content-Disposition: inline;filename=\"%s.jpg\"\r\n"
+	    "Content-Type: %s\r\n"
+	    "Content-Disposition: inline;filename=\"%s.%s\"\r\n"
 #ifdef CHUNKED
 	    "Transfer-Encoding: chunked\r\n"
 #endif
 	    "\r\n",
-	    VERSION, session->response->getCacheControl().c_str(), (*session->image)->getTimestamp().c_str(), basename.c_str() );
+	    VERSION, session->response->getCacheControl().c_str(),
+	    (*session->image)->getTimestamp().c_str(),
+	    compressor->getMimeType(), basename.c_str(), compressor->getSuffix() );
 
   session->out->printf( (const char*) str );
 #endif
 
 
   // Get our requested region from our TileManager
-  TileManager tilemanager( session->tileCache, *session->image, session->watermark, session->jpeg, session->logfile, session->loglevel );
+  TileManager tilemanager( session->tileCache, *session->image, session->watermark, compressor, session->logfile, session->loglevel );
   RawTile complete_image = tilemanager.getRegion( requested_res,
 						  session->view->xangle, session->view->yangle,
 						  session->view->getLayers(),
@@ -331,27 +350,49 @@ void CVT::send( Session* session ){
   }
 
 
+  // Set ICC profile if of a reasonable size
+  if( session->view->embedICC() && ((*session->image)->getMetadata("icc").size()>0) ){
+    if( (*session->image)->getMetadata("icc").size() < 65536 ){
+      if( session->loglevel >= 3 ){
+	*(session->logfile) << "CVT :: Embedding ICC profile with size "
+			    << (*session->image)->getMetadata("icc").size() << " bytes" << endl;
+      }
+      compressor->setICCProfile( (*session->image)->getMetadata("icc") );
+    }
+    else{
+      if( session->loglevel >= 3 ){
+	*(session->logfile) << "CVT :: ICC profile with size "
+			    << (*session->image)->getMetadata("icc").size() << " bytes is too large: Not embedding" << endl;
+      }
+    }
+  }
 
-  // Initialise our JPEG compression object
-  session->jpeg->InitCompression( complete_image, resampled_height );
 
   // Add XMP metadata if this exists
   if( (*session->image)->getMetadata("xmp").size() > 0 ){
-    if( session->loglevel >= 4 ) *(session->logfile) << "CVT :: Adding XMP metadata" << endl;
-    session->jpeg->addMetadata( (*session->image)->getMetadata("xmp") );
+    if( session->loglevel >= 3 ){
+      *(session->logfile) << "CVT :: Embedding XMP metadata with size "
+			  << (*session->image)->getMetadata("xmp").size() << " bytes" << endl;
+    }
+    compressor->setXMPMetadata( (*session->image)->getMetadata("xmp") );
   }
 
-  len = session->jpeg->getHeaderSize();
+
+  // Initialise our output compression object
+  compressor->InitCompression( complete_image, resampled_height );
+
+
+  len = compressor->getHeaderSize();
 
 #ifdef CHUNKED
   snprintf( str, 1024, "%X\r\n", len );
-  if( session->loglevel >= 4 ) *(session->logfile) << "CVT :: JPEG Header Chunk : " << str;
+  if( session->loglevel >= 4 ) *(session->logfile) << "CVT :: Output Header Chunk : " << str;
   session->out->printf( str );
 #endif
 
-  if( session->out->putStr( (const char*) session->jpeg->getHeader(), len ) != len ){
+  if( session->out->putStr( (const char*) compressor->getHeader(), len ) != len ){
     if( session->loglevel >= 1 ){
-      *(session->logfile) << "CVT :: Error writing jpeg header" << endl;
+      *(session->logfile) << "CVT :: Error writing header" << endl;
     }
   }
 
@@ -362,7 +403,7 @@ void CVT::send( Session* session ){
   // Flush our block of data
   if( session->out->flush() == -1 ) {
     if( session->loglevel >= 1 ){
-      *(session->logfile) << "CVT :: Error flushing jpeg data" << endl;
+      *(session->logfile) << "CVT :: Error flushing output data" << endl;
     }
   }
 
@@ -384,11 +425,11 @@ void CVT::send( Session* session ){
     if( (n==strips-1) && (resampled_height%strip_height!=0) ) strip_height = resampled_height % strip_height;
 
     if( session->loglevel >= 3 ){
-      *(session->logfile) << "CVT :: About to JPEG compress strip with height " << strip_height << endl;
+      *(session->logfile) << "CVT :: About to compress strip with height " << strip_height << endl;
     }
 
     // Compress the strip
-    len = session->jpeg->CompressStrip( input, output, strip_height );
+    len = compressor->CompressStrip( input, output, strip_height );
 
     if( session->loglevel >= 3 ){
       *(session->logfile) << "CVT :: Compressed data strip length is " << len << endl;
@@ -404,7 +445,7 @@ void CVT::send( Session* session ){
     // Send this strip out to the client
     if( len != session->out->putStr( (const char*) output, len ) ){
       if( session->loglevel >= 1 ){
-	*(session->logfile) << "CVT :: Error writing jpeg strip data: " << len << endl;
+	*(session->logfile) << "CVT :: Error writing strip: " << len << endl;
       }
     }
 
@@ -416,14 +457,14 @@ void CVT::send( Session* session ){
     // Flush our block of data
     if( session->out->flush() == -1 ) {
       if( session->loglevel >= 1 ){
-	*(session->logfile) << "CVT :: Error flushing jpeg data" << endl;
+	*(session->logfile) << "CVT :: Error flushing data" << endl;
       }
     }
 
   }
 
   // Finish off the image compression
-  len = session->jpeg->Finish( output );
+  len = compressor->Finish( output );
 
 #ifdef CHUNKED
   snprintf( str, 1024, "%X\r\n", len );
@@ -433,7 +474,7 @@ void CVT::send( Session* session ){
 
   if( session->out->putStr( (const char*) output, len ) != len ){
     if( session->loglevel >= 1 ){
-      *(session->logfile) << "CVT :: Error writing jpeg EOI markers" << endl;
+      *(session->logfile) << "CVT :: Error writing output" << endl;
     }
   }
 
@@ -449,7 +490,7 @@ void CVT::send( Session* session ){
 
   if( session->out->flush()  == -1 ) {
     if( session->loglevel >= 1 ){
-      *(session->logfile) << "CVT :: Error flushing jpeg tile" << endl;
+      *(session->logfile) << "CVT :: Error flushing output" << endl;
     }
   }
 
