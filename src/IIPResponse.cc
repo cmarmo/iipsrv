@@ -115,7 +115,7 @@ string IIPResponse::formatResponse() {
 
 
 
-string IIPResponse::getAdvert( const string& version ){
+string IIPResponse::getAdvert(){
 
   string advert = server + eof + "Content-Type: text/html" + eof;
   advert += "Status: 400 Bad Request" + eof;
