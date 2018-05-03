@@ -78,7 +78,7 @@ class IIPImage {
   std::string suffix;
 
   /// Private function to determine the image type
-  void testImageType()
+  void testImageType();
 
   /// If we have a sequence of images, determine which horizontal angles exist
   void measureHorizontalAngles();
@@ -134,7 +134,7 @@ class IIPImage {
   /// Quality layers
   unsigned int quality_layers;
 
-  /// Indicate whether we have opened and initialised some paramters for this image
+  /// Indicate whether we have opened and initialised some parameters for this image
   bool isSet;
 
   /// If we have an image sequence, the current X and Y position
@@ -254,7 +254,7 @@ class IIPImage {
   /// Get the image timestamp
   /** @param s file path
    */
-  void updateTimestamp( const std::string& s ) throw( file_error );
+  void updateTimestamp( const std::string& s );
 
   /// Get a HTTP RFC 1123 formatted timestamp
   const std::string getTimestamp();

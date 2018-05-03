@@ -1,7 +1,7 @@
 /*
     IIP JTL Command Handler Class Member Function
 
-    Copyright (C) 2006-2015 Ruven Pillay.
+    Copyright (C) 2006-2016 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -34,6 +34,11 @@ void JTL::send( Session* session, int resolution, int tile ){
   Timer function_timer;
 
 
+  // Make sure we have set our image
+  this->session = session;
+  checkImage();
+
+
   // Time this command
   if( session->loglevel >= 2 ) command_timer.start();
 
@@ -63,11 +68,24 @@ void JTL::send( Session* session, int resolution, int tile ){
     throw error.str();
   }
 
+
   TileManager tilemanager( session->tileCache, *session->image, session->watermark, session->jpeg, session->logfile, session->loglevel );
 
-  // Setting compression type to UNCOMPRESSED to force all image types to go through normalization
   CompressionType ct;
+
+  // Setting compression type to UNCOMPRESSED to force all image types to go through normalization
   ct = UNCOMPRESSED;
+
+
+  // Embed ICC profile
+  if( session->view->embedICC() && ((*session->image)->getMetadata("icc").size()>0) ){
+    if( session->loglevel >= 3 ){
+      *(session->logfile) << "JTL :: Embedding ICC profile with size "
+			  << (*session->image)->getMetadata("icc").size() << " bytes" << endl;
+    }
+    session->jpeg->setICCProfile( (*session->image)->getMetadata("icc") );
+  }
+
 
   RawTile rawtile = tilemanager.getTile( resolution, tile, session->view->xangle,
 					 session->view->yangle, session->view->getLayers(), ct );
