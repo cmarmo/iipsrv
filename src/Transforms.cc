@@ -2,7 +2,7 @@
 
 /*  IIP fcgi server module - image processing routines
 
-    Copyright (C) 2004-2015 Ruven Pillay.
+    Copyright (C) 2004-2017 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -49,6 +49,7 @@ static bool isfinite( float arg )
 /* Size threshold for using parallel loops (256x256 pixels)
  */
 #define PARALLEL_THRESHOLD 65536
+
 
 static const float _sRGB[3][3] = { {  3.240479, -1.537150, -0.498535 },
 				   { -0.969256, 1.875992, 0.041556 },
@@ -414,6 +415,7 @@ void filter_inv( RawTile& in ){
 // Resize image using nearest neighbour interpolation
 void filter_interpolate_nearestneighbour( RawTile& in, unsigned int resampled_width, unsigned int resampled_height ){
 
+  // Pointer to input buffer
   float *buf = (float*)in.data;
 
   int channels = in.channels;
@@ -452,6 +454,7 @@ void filter_interpolate_nearestneighbour( RawTile& in, unsigned int resampled_wi
 //  - Floating point implementation which benchmarks about 2.5x slower than nearest neighbour
 void filter_interpolate_bilinear( RawTile& in, unsigned int resampled_width, unsigned int resampled_height ){
 
+  // Pointer to input buffer
   float *buf = (float*) in.data;
 
   int channels = in.channels;
@@ -474,20 +477,29 @@ void filter_interpolate_bilinear( RawTile& in, unsigned int resampled_width, uns
 
     for( unsigned int i=0; i<resampled_width; i++ ){
 
-      // Index to the current pyramid resolution's bottom left right pixel
-      unsigned int ii = (unsigned int) floorf(i*xscale);
+      // Index to the current pyramid resolution's top left pixel
+      int ii = (int) floor( i*xscale );
 
       // Calculate the indices of the 4 surrounding pixels
-      unsigned int p11 = (unsigned int) ( channels * ( ii + jj*width ) );
-      unsigned int p12 = (unsigned int) ( channels * ( ii + (jj+1)*width ) );
-      unsigned int p21 = (unsigned int) ( channels * ( (ii+1) + jj*width ) );
-      unsigned int p22 = (unsigned int) ( channels * ( (ii+1) + (jj+1)*width ) );
-      unsigned int resampled_index = ((i + j*resampled_width) * channels);
+      unsigned int p11, p12, p21, p22;
+      unsigned long jj_w = jj*width;
+      p11 = (unsigned int) ( channels * ( ii + jj_w ) );
+      p12 = (unsigned int) ( channels * ( ii + (jj_w+width) ) );
+      p21 = (unsigned int) ( channels * ( (ii+1) + jj_w ) );
+      p22 = (unsigned int) ( channels * ( (ii+1) + (jj_w+width) ) );
+
+      // Make sure we don't stray outside our input buffer boundary
+      // - use replication at the edge
+      p12 = (p12<=np)? p12 : np-channels;
+      p22 = (p22<=np)? p22 : np-channels;
 
       // Calculate the rest of our weights
       float iscale = i*xscale;
       float a = (float)(ii+1) - iscale;
       float b = iscale - (float)ii;
+
+      // Output buffer index
+      unsigned int resampled_index = j*resampled_width*in.channels + i*in.channels;
 
       for( int k=0; k<in.channels; k++ ){
 

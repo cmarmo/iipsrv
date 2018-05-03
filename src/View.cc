@@ -1,7 +1,7 @@
 /*
     View Member Functions
 
-    Copyright (C) 2004-2015 Ruven Pillay.
+    Copyright (C) 2004-2016 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -24,14 +24,18 @@
 using namespace std;
 
 
+/// Calculate optimal resolution for a given requested pixel dimension
 void View::calculateResolution( unsigned int dimension,
 				unsigned int requested_size ){
 
   unsigned int j = 1;
   unsigned int d = dimension;
 
+  if( requested_size < min_size ) requested_size = min_size;
+  unsigned int rs = (requested_size<min_size) ? min_size : requested_size;
+
   // Calculate the resolution number for this request
-  while( d >= requested_size ){
+  while( d >= rs ){
     d = d/2;
     j++;
   }
@@ -111,7 +115,9 @@ float View::getScale(){
 
   float scale = static_cast<float>(rw) / static_cast<float>(width);
 
+
   if( static_cast<float>(rh) / static_cast<float>(res_height) < scale ) scale = static_cast<float>(rh) / static_cast<float>(res_height);
+
 
   // Sanity check
   if( scale <= 0 || scale > 1.0 ) scale = 1.0;
