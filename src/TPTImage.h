@@ -59,7 +59,7 @@ class TPTImage : public IIPImage {
   TPTImage( const TPTImage& image ): IIPImage( image ), tiff( NULL ),tile_buf( NULL ) {};
 
   /// Assignment Operator
-  /** @param TPTImage object
+  /** @param image TPTImage object
    */
   TPTImage& operator = ( TPTImage image ) {
     if( this != &image ){
@@ -82,13 +82,13 @@ class TPTImage : public IIPImage {
   ~TPTImage() { closeImage(); };
 
   /// Overloaded function for opening a TIFF image
-  void openImage() throw (file_error);
+  void openImage();
 
   /// Overloaded function for loading TIFF image information
   /** @param x horizontal sequence angle
       @param y vertical sequence angle
    */
-  void loadImageInfo( int x, int y ) throw (file_error);
+  void loadImageInfo( int x, int y );
 
   /// Overloaded function for closing a TIFF image
   void closeImage();

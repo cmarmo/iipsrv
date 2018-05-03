@@ -30,7 +30,7 @@ using namespace std;
 void TPTImage::openImage()
 {
 
-  // Insist that the tiff and tile_buf be non-NULL
+  // Insist that the tiff and tile_buf be NULL
   if( tiff || tile_buf ){
     throw file_error( "TPT::openImage: tiff or tile_buf is not NULL" );
   }
