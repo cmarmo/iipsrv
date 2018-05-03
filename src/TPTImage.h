@@ -2,7 +2,7 @@
 
 /*  IIPImage Tiled Pyramidal TIFF Class
 
-    Copyright (C) 2000-2014 Ruven Pillay.
+    Copyright (C) 2000-2017 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -28,30 +28,7 @@
 #include <tiff.h>
 #include <tiffio.h>
 
-#define	MAX_TIFF_CACHE 1024
 
-#ifndef _TASK_H
-#include "Task.h"
-#endif
-
-
-#ifdef USE_HASHMAP
-#include <ext/hash_map>
-
-#ifdef USE_POOL_ALLOCATOR
-#include <ext/pool_allocator.h>
-typedef __gnu_cxx::hash_map < const std::string, TIFF *,
-			      __gnu_cxx::hash< const std::string >,
-			      std::equal_to< const std::string >,
-			      __gnu_cxx::__pool_alloc< std::pair<const std::string,TIFF *> >
-			      > TIFFCacheMapType;
-#else
-typedef __gnu_cxx::hash_map <const std::string,TIFF *> TIFFCacheMapType;
-#endif
-
-#else
-typedef std::map<const std::string,TIFF *> TIFFCacheMapType;
-#endif
 
 
 /// Image class for Tiled Pyramidal Images: Inherits from IIPImage. Uses libtiff
@@ -123,7 +100,7 @@ class TPTImage : public IIPImage {
       @param l quality layers
       @param t tile number
    */
-  RawTile getTile( int x, int y, unsigned int r, int l, unsigned int t ) throw (file_error);
+  RawTile getTile( int x, int y, unsigned int r, int l, unsigned int t );
 
 };
 

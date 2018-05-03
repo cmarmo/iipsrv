@@ -2,7 +2,7 @@
 
 /*  IIP Server: Tiled Pyramidal TIFF handler
 
-    Copyright (C) 2000-2014 Ruven Pillay.
+    Copyright (C) 2000-2017 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -24,11 +24,10 @@
 #include "TPTImage.h"
 #include <sstream>
 
-TIFFCacheMapType	tiffCache;
 
 using namespace std;
 
-void TPTImage::openImage() throw (file_error)
+void TPTImage::openImage()
 {
 
   // Insist that the tiff and tile_buf be non-NULL
@@ -41,36 +40,9 @@ void TPTImage::openImage() throw (file_error)
   // Update our timestamp
   updateTimestamp( filename );
 
-//<<<<<<< HEAD
-  if ( tiffCache.empty() ){
-    if( ( tiff = TIFFOpen( filename.c_str(), "r" ) ) == NULL ){
-      throw file_error( "tiff open failed for: " + filename );
-    }
-    tiffCache[ filename ] = tiff;
-  }
-    // If not, look up our object
-  else{
-    // Cache Hit
-    if( tiffCache.find(filename) != tiffCache.end() ){
-      tiff = tiffCache[ filename ];
-    }
-    // Cache Miss
-    else{
-      if( ( tiff = TIFFOpen( filename.c_str(), "r" ) ) == NULL ){
-        throw file_error( "tiff open failed for: " + filename );
-      }
-    // Delete items if our list of files is too long.
-      if( tiffCache.size() >= MAX_TIFF_CACHE ) {
-        TIFFClose( tiffCache.begin()->second );
-        tiffCache.erase( tiffCache.begin() );
-      }
-      tiffCache[ filename ] = tiff;
-    }
-//=======
   // Try to open and allocate a buffer
-//  if( ( tiff = TIFFOpen( filename.c_str(), "rm" ) ) == NULL ){
-//    throw file_error( "tiff open failed for: " + filename );
-//>>>>>>> upstream/master
+  if( ( tiff = TIFFOpen( filename.c_str(), "rm" ) ) == NULL ){
+    throw file_error( "tiff open failed for: " + filename );
   }
 
   // Load our metadata if not already loaded
@@ -83,10 +55,11 @@ void TPTImage::openImage() throw (file_error)
 
   isSet = true;
 
+
 }
 
 
-void TPTImage::loadImageInfo( int seq, int ang ) throw(file_error)
+void TPTImage::loadImageInfo( int seq, int ang )
 {
   tdir_t current_dir;
   int count;
@@ -180,7 +153,8 @@ void TPTImage::loadImageInfo( int seq, int ang ) throw(file_error)
   for( unsigned int i=0; i<channels; i++ ){
     if( (!sminvalue) == smaxvalue[i] ){
       // Set default values if values not included in header
-      if( bpc == 8 ) smaxvalue[i] = 255.0;
+      if( bpc <= 8 ) smaxvalue[i] = 255.0;
+      else if( bpc == 12 ) smaxvalue[i] = 4095.0;
       else if( bpc == 16 ) smaxvalue[i] = 65535.0;
       else if( bpc == 32 && sampleType == FIXEDPOINT ) smaxvalue[i] = 4294967295.0;
     }
@@ -195,6 +169,7 @@ void TPTImage::loadImageInfo( int seq, int ang ) throw(file_error)
   if( TIFFGetField( tiff, TIFFTAG_IMAGEDESCRIPTION, &tmp ) ) metadata["subject"] = tmp;
   if( TIFFGetField( tiff, TIFFTAG_SOFTWARE, &tmp ) ) metadata["app-name"] = tmp;
   if( TIFFGetField( tiff, TIFFTAG_XMLPACKET, &count, &tmp ) ) metadata["xmp"] = string(tmp,count);
+  if( TIFFGetField( tiff, TIFFTAG_ICCPROFILE, &count, &tmp ) ) metadata["icc"] = string(tmp,count);
 
 }
 
@@ -202,7 +177,7 @@ void TPTImage::loadImageInfo( int seq, int ang ) throw(file_error)
 void TPTImage::closeImage()
 {
   if( tiff != NULL ){
-//    TIFFClose( tiff );
+    TIFFClose( tiff );
     tiff = NULL;
   }
   if( tile_buf != NULL ){
@@ -212,7 +187,7 @@ void TPTImage::closeImage()
 }
 
 
-RawTile TPTImage::getTile( int seq, int ang, unsigned int res, int layers, unsigned int tile ) throw (file_error)
+RawTile TPTImage::getTile( int seq, int ang, unsigned int res, int layers, unsigned int tile )
 {
   uint32 im_width, im_height, tw, th, ntlx, ntly;
   uint32 rem_x, rem_y;
@@ -238,35 +213,8 @@ RawTile TPTImage::getTile( int seq, int ang, unsigned int res, int layers, unsig
   // Open the TIFF if it's not already open
   if( !tiff ){
     filename = getFileName( seq, ang );
-//<<<<<<< HEAD
-    if ( tiffCache.empty() ){
-      if( ( tiff = TIFFOpen( filename.c_str(), "r" ) ) == NULL ){
-        throw file_error( "tiff open failed for: " + filename );
-      }
-      tiffCache[ filename ] = tiff;
-    }
-      // If not, look up our object
-    else{
-      // Cache Hit
-      if( tiffCache.find(filename) != tiffCache.end() ){
-        tiff = tiffCache[ filename ];
-      }
-      // Cache Miss
-      else{
-        if( ( tiff = TIFFOpen( filename.c_str(), "r" ) ) == NULL ){
-          throw file_error( "tiff open failed for: " + filename );
-        }
-      // Delete items if our list of files is too long.
-        if( tiffCache.size() >= MAX_TIFF_CACHE ) {
-          TIFFClose( tiffCache.begin()->second );
-          tiffCache.erase( tiffCache.begin() );
-        }
-        tiffCache[ filename ] = tiff;
-      }
-//=======
-//    if( ( tiff = TIFFOpen( filename.c_str(), "rm" ) ) == NULL ){
-//      throw file_error( "tiff open failed for:" + filename );
-//>>>>>>> upstream/master
+    if( ( tiff = TIFFOpen( filename.c_str(), "rm" ) ) == NULL ){
+      throw file_error( "tiff open failed for:" + filename );
     }
   }
 
@@ -308,6 +256,10 @@ RawTile TPTImage::getTile( int seq, int ang, unsigned int res, int layers, unsig
   TIFFGetField( tiff, TIFFTAG_PHOTOMETRIC, &colour );
 //   TIFFGetField( tiff, TIFFTAG_SAMPLESPERPIXEL, &channels );
 //   TIFFGetField( tiff, TIFFTAG_BITSPERSAMPLE, &bpc );
+
+
+  // Total number of bytes in tile
+  unsigned int np = tw * th;
 
 
   // Get the width and height for last row and column tiles
@@ -372,6 +324,42 @@ RawTile TPTImage::getTile( int seq, int ang, unsigned int res, int layers, unsig
   rawtile.memoryManaged = 0;
   rawtile.padded = true;
   rawtile.sampleType = sampleType;
+
+
+  // Pad 1 bit 1 channel bilevel images to 8 bits for output
+  if( bpc==1 && channels==1 ){
+
+    // Pixel index
+    unsigned int n = 0;
+
+    // Calculate number of bytes used - round integer up efficiently
+    unsigned int nbytes = (np + 7) / 8;
+    unsigned char *buffer = new unsigned char[np];
+
+    // Take into account photometric interpretation:
+    //   0: white is zero, 1: black is zero
+    unsigned char min = (unsigned char) 0;
+    unsigned char max = (unsigned char) 255;
+    if( colour == 0 ){
+      min = (unsigned char) 255; max = (unsigned char) 0;
+    }
+
+    // Unpack each raw byte into 8 8-bit pixels
+    for( unsigned int i=0; i<nbytes; i++ ){
+      unsigned char t = ((unsigned char*)tile_buf)[i];
+      // Count backwards as TIFF is usually MSB2LSB
+      for( int k=7; k>=0; k-- ){
+	// Set values depending on whether bit is set
+	buffer[n++] = (t & (1 << k)) ? max : min;
+      }
+    }
+
+    rawtile.dataLength = n;
+    rawtile.data = buffer;
+    rawtile.bpc = 8;
+    rawtile.memoryManaged = 1;
+  }
+
 
   return( rawtile );
 
