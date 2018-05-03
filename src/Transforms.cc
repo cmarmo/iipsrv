@@ -573,7 +573,7 @@ void filter_rotate( RawTile& in, float angle=0.0 ){
   // Currently implemented only for rectangular rotations
   if( (int)angle % 90 == 0 && (int)angle % 360 != 0 ){
 
-    // Intialize our counter
+    // Initialize our counter
     unsigned int n = 0;
 
     // Allocate memory for our temporary buffer - rotate function only ever operates on 8bit data
@@ -597,8 +597,8 @@ void filter_rotate( RawTile& in, float angle=0.0 ){
     else if( (int) angle % 360 == 270 ){
 #pragma ivdep
       for( int i=in.width-1; i>=0; i-- ){
-	unsigned int n = i*in.height*in.channels;
-	for( unsigned int j=0; j < in.height; j++ ){
+	unsigned int n = (in.width-1-i)*in.height*in.channels;
+	for( unsigned int j=0; j<in.height; j++ ){
 	  unsigned int index = (in.width*j + i)*in.channels;
 	  for( int k=0; k < in.channels; k++ ){
 	    ((unsigned char*)buffer)[n++] = ((unsigned char*)in.data)[index+k];
@@ -737,7 +737,6 @@ void filter_flatten( RawTile& in, int bands ){
 void filter_flip( RawTile& rawtile, int orientation ){
 
   unsigned char* buffer = new unsigned char[rawtile.width * rawtile.height * rawtile.channels];
-  unsigned long n = 0;
 
   // Vertical
   if( orientation == 2 ){

@@ -249,7 +249,7 @@ unsigned int View::getRequestHeight(){
   }
 
   // Limit our requested height to the maximum export size
-  if( h > max_size ) requested_height = max_size;
+  if( h > max_size ) h = max_size;
 
   return h;
 }

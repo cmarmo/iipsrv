@@ -60,7 +60,7 @@ class View{
 
 
   /// Internal function to calculate the resolution associated with a width
-  ///  or height request. This also takes into account maximum size limits.
+  ///  or height request. This also takes into account maximum & minimum size limits.
   /** @param m maximum size
       @param r requested size
    */
