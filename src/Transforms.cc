@@ -460,6 +460,7 @@ void filter_interpolate_bilinear( RawTile& in, unsigned int resampled_width, uns
   int channels = in.channels;
   unsigned int width = in.width;
   unsigned int height = in.height;
+  unsigned long np = in.channels * in.width * in.height;
 
   // Calculate our scale
   float xscale = (float)width / (float)resampled_width;

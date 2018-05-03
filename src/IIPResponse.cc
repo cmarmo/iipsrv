@@ -121,7 +121,7 @@ string IIPResponse::getAdvert(){
   advert += "Status: 400 Bad Request" + eof;
   advert += "Content-Disposition: inline;filename=\"iipsrv.html\"" + eof + eof;
   advert += "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"/><title>IIPImage Server</title><meta name=\"DC.creator\" content=\"Ruven Pillay &lt;ruven@users.sourceforge.net&gt;\"/><meta name=\"DC.title\" content=\"IIPImage Server\"/><meta name=\"DC.source\" content=\"http://iipimage.sourceforge.net\"/></head><body style=\"font-family:Helvetica,sans-serif; margin:4em\"><center><h1>IIPImage Server</h1><h2>\"Astro\" Version "
-    + version + "</h2><br/><h3>Project Home Page: <a href=\"http://iipimage.sourceforge.net\">http://iipimage.sourceforge.net</a></h3><br/><h4>Github Page: <a href=\"https://github.com/cmarmo/iipsrv-astro\">https://github.com/cmarmo/iipsrv-astro</a></h4><h4>Reference: <a href=\"http://arxiv.org/abs/1403.6025\">http://arxiv.org/abs/1403.6025</a></h4></center></body></html>";
+    + string(VERSION) + "</h2><br/><h3>Project Home Page: <a href=\"http://iipimage.sourceforge.net\">http://iipimage.sourceforge.net</a></h3><br/><h4>Github Page: <a href=\"https://github.com/cmarmo/iipsrv-astro\">https://github.com/cmarmo/iipsrv-astro</a></h4><h4>Reference: <a href=\"http://arxiv.org/abs/1403.6025\">http://arxiv.org/abs/1403.6025</a></h4></center></body></html>";
   return advert;
 
 }
