@@ -2,7 +2,7 @@
 
     IIIF Request Command Handler Class Member Function
 
-    Copyright (C) 2014-2016 Ruven Pillay
+    Copyright (C) 2014-2019 Ruven Pillay
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -181,14 +181,17 @@ void IIIF::run( Session* session, const string& src )
                      << "     { \"width\" : " << (*session->image)->image_widths[numResolutions - 1]
                      << ", \"height\" : " << (*session->image)->image_heights[numResolutions - 1] << " }";
 
+
+    // Need to keep track of maximum allowable image export sizes
+    unsigned int max = session->view->getMaxSize();
+
     for ( int i = numResolutions - 2; i > 0; i-- ){
       unsigned int w = (*session->image)->image_widths[i];
       unsigned int h = (*session->image)->image_heights[i];
-      unsigned int max = session->view->getMaxSize();
       // Only advertise images below our max size value
       if( (max == 0) || (w < max && h < max) ){
-	infoStringStream << "," << endl
-			 << "     { \"width\" : " << w << ", \"height\" : " << h << " }";
+        infoStringStream << "," << endl
+        << "     { \"width\" : " << w << ", \"height\" : " << h << " }";
       }
     }
 
@@ -198,7 +201,7 @@ void IIIF::run( Session* session, const string& src )
                      << ", \"scaleFactors\" : [ 1"; // Scale 1 is original image
 
     for ( unsigned int i = 1; i < numResolutions; i++ ){
-      infoStringStream << ", " << pow(2.0, (double)i);
+      infoStringStream << ", " << (1<<i);
     }
 
     infoStringStream << " ] }" << endl
@@ -206,8 +209,10 @@ void IIIF::run( Session* session, const string& src )
                      << "  \"profile\" : [" << endl
                      << "     \"" << IIIF_PROFILE << "\"," << endl
                      << "     { \"formats\" : [ \"jpg\" ]," << endl
-                     << "       \"qualities\" : [ \"native\",\"color\",\"gray\" ]," << endl
-                     << "       \"supports\" : [\"regionByPct\",\"regionSquare\",\"sizeByForcedWh\",\"sizeByWh\",\"sizeAboveFull\",\"rotationBy90s\",\"mirroring\"] }" << endl
+                     << "       \"qualities\" : [ \"native\",\"color\",\"gray\",\"bitonal\" ]," << endl
+                     << "       \"supports\" : [\"regionByPct\",\"regionSquare\",\"sizeByForcedWh\",\"sizeByWh\",\"sizeAboveFull\",\"rotationBy90s\",\"mirroring\"]," << endl
+		     << "       \"maxWidth\" : " << max << "," << endl
+		     << "       \"maxHeight\" : " << max << "\n     }" << endl
                      << "  ]" << endl
                      << "}";
 
@@ -240,7 +245,7 @@ void IIIF::run( Session* session, const string& src )
     // Keep track of the number of parameters than have been given
     int numOfTokens = 0;
 
-    // Region Parameter: { "full"; "x,y,w,h"; "pct:x,y,w,h" }
+    // Region Parameter: { "full"; "square"; "x,y,w,h"; "pct:x,y,w,h" }
     if ( izer.hasMoreTokens() ){
 
       // Our region parameters
@@ -257,17 +262,23 @@ void IIIF::run( Session* session, const string& src )
         region[2] = 1.0;
         region[3] = 1.0;
       }
-      // Square region export using centered crop
+      // Square region export using centered crop - avaialble in IIIF version 3
       else if (regionString == "square" ){
         if ( height > width ){
-	  float h = (float)width/(float)height;
-	  session->view->setViewTop( (1-h)/2.0 );
-	  session->view->setViewHeight( h );
+	  region[0] = 0.0;
+	  region[2] = 1.0;
+	  region[3] = (float)width/(float)height;
+	  region[1] = (1.0-region[3])/2.0;
+	  session->view->setViewTop( region[1] );
+	  session->view->setViewHeight( region[3] );
         }
 	else if ( width > height ){
-	  float w = (float)height/(float)width;
-	  session->view->setViewLeft( (1-w)/2.0 );
-	  session->view->setViewWidth( w );
+	  region[1] = 0.0;
+	  region[3] = 1.0;
+	  region[2] = (float)height/(float)width;
+	  region[0] = (1.0-region[2])/2.0;
+	  session->view->setViewLeft( region[0] );
+	  session->view->setViewWidth( region[2] );
         }
 	// No need for default else clause if image is already square
       }
@@ -482,6 +493,9 @@ void IIIF::run( Session* session, const string& src )
       }
       else if ( quality == "grey" || quality == "gray" ){
         session->view->colourspace = GREYSCALE;
+      }
+      else if ( quality == "bitonal" ){
+        session->view->colourspace = BINARY;
       }
       else{
         throw invalid_argument( "unsupported quality parameter - must be one of native, color or grey" );

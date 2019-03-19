@@ -3,7 +3,7 @@
 
 /*  IIP fcgi server module
 
-    Copyright (C) 2000-2018 Ruven Pillay.
+    Copyright (C) 2000-2019 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -69,6 +69,7 @@ void IIPImage::swap( IIPImage& first, IIPImage& second ) // nothrow
   std::swap( first.isSet, second.isSet );
   std::swap( first.currentX, second.currentX );
   std::swap( first.currentY, second.currentY );
+  std::swap( first.histogram, second.histogram );
   std::swap( first.metadata, second.metadata );
   std::swap( first.timestamp, second.timestamp );
   std::swap( first.min, second.min );
@@ -119,7 +120,7 @@ void IIPImage::testImageType()
     // Magic file signatures for TIFF (See http://www.garykessler.net/library/file_sigs.html)
     static const unsigned char stdtiff[3] = {0x49,0x20,0x49};       // TIFF
     static const unsigned char lsbtiff[4] = {0x49,0x49,0x2A,0x00};  // Little Endian TIFF
-    static const unsigned char msbtiff[4] = {0x49,0x49,0x2A,0x00};  // Big Endian TIFF
+    static const unsigned char msbtiff[4] = {0x4D,0x4D,0x00,0x2A};  // Big Endian TIFF
     static const unsigned char lbigtiff[4] = {0x4D,0x4D,0x00,0x2B}; // Little Endian BigTIFF
     static const unsigned char bbigtiff[4] = {0x49,0x49,0x2B,0x00}; // Big Endian BigTIFF
 
@@ -215,7 +216,7 @@ void IIPImage::measureVerticalAngles()
   unsigned int i;
 
   string filename = fileSystemPrefix + imagePath + fileNamePattern + "000_*." + suffix;
-  
+
   if( glob( filename.c_str(), 0, NULL, &gdat ) != 0 ){
     globfree( &gdat );
   }
