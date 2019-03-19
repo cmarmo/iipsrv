@@ -2,7 +2,7 @@
 
 /*  IIP Server: Tiled Pyramidal TIFF handler
 
-    Copyright (C) 2000-2017 Ruven Pillay.
+    Copyright (C) 2000-2018 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 
 
 using namespace std;
+
 
 void TPTImage::openImage()
 {
@@ -198,7 +199,7 @@ RawTile TPTImage::getTile( int seq, int ang, unsigned int res, int layers, unsig
   // Check the resolution exists
   if( res > numResolutions ){
     ostringstream error;
-    error << "TPTImage :: Asked for non-existant resolution: " << res;
+    error << "TPTImage :: Asked for non-existent resolution: " << res;
     throw file_error( error.str() );
   }
 
@@ -225,11 +226,11 @@ RawTile TPTImage::getTile( int seq, int ang, unsigned int res, int layers, unsig
   }
 
 
-  // The first resolution is the highest, so we need to invert 
+  // The first resolution is the highest, so we need to invert
   //  the resolution - can avoid this if we store our images with
-  //  the smallest image first. 
+  //  the smallest image first.
   int vipsres = ( numResolutions - 1 ) - res;
-  
+
 
   // Change to the right directory for the resolution
   if( !TIFFSetDirectory( tiff, vipsres ) ) {
@@ -237,12 +238,12 @@ RawTile TPTImage::getTile( int seq, int ang, unsigned int res, int layers, unsig
   }
 
 
-  // Check that a valid tile number was given  
+  // Check that a valid tile number was given
   if( tile >= TIFFNumberOfTiles( tiff ) ) {
     ostringstream tile_no;
-    tile_no << "Asked for non-existant tile: " << tile;
+    tile_no << "Asked for non-existent tile: " << tile;
     throw file_error( tile_no.str() );
-  } 
+  }
 
 
   // Get the size of this tile, the current image,

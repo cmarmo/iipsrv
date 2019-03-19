@@ -1,8 +1,8 @@
 // Image Transform Functions
 
-/*  IIP fcgi server module - image processing routines
+/*  IIPImage image processing routines
 
-    Copyright (C) 2004-2017 Ruven Pillay.
+    Copyright (C) 2004-2019 Ruven Pillay.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 
 
 #include <cmath>
+#include <algorithm>
 #include "Transforms.h"
 
 
@@ -31,7 +32,7 @@
 #include <limits>
 static bool isfinite( float arg )
 {
-  return arg == arg && 
+  return arg == arg &&
     arg != std::numeric_limits<float>::infinity() &&
     arg != -std::numeric_limits<float>::infinity();
 }
@@ -59,7 +60,7 @@ using namespace std;
 
 
 // Normalization function
-void filter_normalize( RawTile& in, vector<float>& max, vector<float>& min ) {
+void Transform::normalize( RawTile& in, const vector<float>& max, const vector<float>& min ) {
 
   float *normdata;
   unsigned int np = in.dataLength * 8 / in.bpc;
@@ -88,7 +89,9 @@ void filter_normalize( RawTile& in, vector<float>& max, vector<float>& min ) {
     if( in.bpc == 32 && in.sampleType == FLOATINGPOINT ) {
       fptr = (float*)in.data;
       // Loop through our pixels for floating point pixels
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
       for( unsigned int n=c; n<np; n+=nc ){
         normdata[n] = isfinite(fptr[n])? (fptr[n] - minc) * invdiffc : 0.0;
       }
@@ -96,7 +99,9 @@ void filter_normalize( RawTile& in, vector<float>& max, vector<float>& min ) {
     else if( in.bpc == 32 && in.sampleType == FIXEDPOINT ) {
       uiptr = (unsigned int*)in.data;
       // Loop through our pixels for unsigned int pixels
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
       for( unsigned int n=c; n<np; n+=nc ){
         normdata[n] = (uiptr[n] - minc) * invdiffc;
       }
@@ -104,7 +109,9 @@ void filter_normalize( RawTile& in, vector<float>& max, vector<float>& min ) {
     else if( in.bpc == 16 ) {
       usptr = (unsigned short*)in.data;
       // Loop through our unsigned short pixels
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
       for( unsigned int n=c; n<np; n+=nc ){
         normdata[n] = (usptr[n] - minc) * invdiffc;
       }
@@ -112,14 +119,16 @@ void filter_normalize( RawTile& in, vector<float>& max, vector<float>& min ) {
     else {
       ucptr = (unsigned char*)in.data;
       // Loop through our unsigned char pixels
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
       for( unsigned int n=c; n<np; n+=nc ){
         normdata[n] = (ucptr[n] - minc) * invdiffc;
       }
     }
   }
 
-  // Delete our original buffers, unless we already had floats
+  // Delete our original buffers, we already had floats
   if( in.bpc == 32 && in.sampleType == FIXEDPOINT ){
     delete[] (unsigned int*) in.data;
   }
@@ -133,14 +142,14 @@ void filter_normalize( RawTile& in, vector<float>& max, vector<float>& min ) {
   // Assign our new buffer and modify some info
   in.data = normdata;
   in.bpc = 32;
-  in.dataLength = np * in.bpc / 8;
+  in.dataLength = np * (in.bpc/8);
 
 }
 
 
 
 // Hillshading function
-void filter_shade( RawTile& in, int h_angle, int v_angle ){
+void Transform::shade( RawTile& in, int h_angle, int v_angle ){
 
   float o_x, o_y, o_z;
 
@@ -172,7 +181,9 @@ void filter_shade( RawTile& in, int h_angle, int v_angle ){
   buffer = new float[ndata];
 
 
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
   for( unsigned int k=0; k<ndata; k++ ){
 
     unsigned int n = k*3;
@@ -201,13 +212,13 @@ void filter_shade( RawTile& in, int h_angle, int v_angle ){
 
   in.data = buffer;
   in.channels = 1;
-  in.dataLength = in.width * in.height * in.bpc / 8;
+  in.dataLength = in.width * in.height * (in.bpc/8);
 }
 
 
 
 // Convert a single pixel from CIELAB to sRGB
-static void LAB2sRGB( unsigned char *in, unsigned char *out ){
+void Transform::LAB2sRGB( unsigned char *in, unsigned char *out ){
 
   /* First convert to XYZ
    */
@@ -249,7 +260,6 @@ static void LAB2sRGB( unsigned char *in, unsigned char *out ){
   Y /= 100.0;
   Z /= 100.0;
 
-
   /* Then convert to sRGB
    */
   R = (X * _sRGB[0][0]) + (Y * _sRGB[0][1]) + (Z * _sRGB[0][2]);
@@ -258,10 +268,9 @@ static void LAB2sRGB( unsigned char *in, unsigned char *out ){
 
   /* Clip any -ve values
    */
-  if( R < 0.0 ) R = 0.0;
-  if( G < 0.0 ) G = 0.0;
-  if( B < 0.0 ) B = 0.0;
-
+  R = (R<0.0 ? 0.0 : R);
+  G = (G<0.0 ? 0.0 : G);
+  B = (B<0.0 ? 0.0 : B);
 
   /* We now need to convert these to non-linear display values
    */
@@ -282,10 +291,9 @@ static void LAB2sRGB( unsigned char *in, unsigned char *out ){
 
   /* Clip to our 8 bit limit
    */
-  if( R > 255.0 ) R = 255.0;
-  if( G > 255.0 ) G = 255.0;
-  if( B > 255.0 ) B = 255.0;
-
+  R = (R>255.0 ? 255.0 : R);
+  G = (G>255.0 ? 255.0 : G);
+  B = (B>255.0 ? 255.0 : B);
 
   /* Return our sRGB values
    */
@@ -298,11 +306,13 @@ static void LAB2sRGB( unsigned char *in, unsigned char *out ){
 
 
 // Convert whole tile from CIELAB to sRGB
-void filter_LAB2sRGB( RawTile& in ){
+void Transform::LAB2sRGB( RawTile& in ){
 
   unsigned long np = in.width * in.height * in.channels;
 
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
   for( unsigned long n=0; n<np; n+=in.channels ){
     unsigned char* ptr = (unsigned char*) in.data;
     unsigned char q[3];
@@ -316,7 +326,9 @@ void filter_LAB2sRGB( RawTile& in ){
 
 
 // Colormap function
-void filter_cmap( RawTile& in, enum cmap_type cmap ){
+// Based on the routine colormap.cpp in Imagin Raytracer by Olivier Ferrand
+// http://www.imagin-raytracer.org
+void Transform::cmap( RawTile& in, enum cmap_type cmap ){
 
   float value;
   unsigned in_chan = in.channels;
@@ -331,8 +343,11 @@ void filter_cmap( RawTile& in, enum cmap_type cmap ){
   float *outv = outptr;
 
   switch(cmap){
+
     case HOT:
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
       for( int unsigned n=0; n<ndata; n+=in_chan, outv+=3 ){
         value = fptr[n];
         if(value>1.)
@@ -348,8 +363,11 @@ void filter_cmap( RawTile& in, enum cmap_type cmap ){
         else { outv[0]=outv[1]=outv[2]=1.; }
       }
       break;
+
     case COLD:
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
       for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ){
         value = fptr[n];
         if(value>1.)
@@ -365,8 +383,11 @@ void filter_cmap( RawTile& in, enum cmap_type cmap ){
         else {outv[0]=outv[1]=outv[2]=1.;}
       }
       break;
+
     case JET:
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
       for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ){
         value = fptr[n];
         if(value<0.)
@@ -384,36 +405,74 @@ void filter_cmap( RawTile& in, enum cmap_type cmap ){
         else { outv[0]=0.5; outv[1]=outv[2]=0.; }
       }
       break;
+
+    case RED:
+#if defined(__ICC) || defined(__INTEL_COMPILER)
+#pragma ivdep
+#endif
+      for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ){
+	value = fptr[n];
+	outv[0] = value;
+	outv[1] = outv[2] = 0.;
+      }
+      break;
+
+    case GREEN:
+#if defined(__ICC) || defined(__INTEL_COMPILER)
+#pragma ivdep
+#endif
+      for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ) {
+	value = fptr[n];
+	outv[0] = outv[2] = 0.;
+	outv[1] = value;
+      }
+      break;
+
+    case BLUE:
+#if defined(__ICC) || defined(__INTEL_COMPILER)
+#pragma ivdep
+#endif
+      for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ) {
+	value = fptr[n];
+	outv[0] = outv[1] = 0;
+	outv[2] = value;
+      }
+      break;
+
     default:
       break;
-    };
 
+  };
 
   // Delete old data buffer
   delete[] (float*) in.data;
   in.data = outptr;
   in.channels = out_chan;
-  in.dataLength = ndata * out_chan * in.bpc / 8;
+  in.dataLength = ndata * out_chan * (in.bpc/8);
 }
 
 
 
 // Inversion function
-void filter_inv( RawTile& in ){
+void Transform::inv( RawTile& in ){
 
   unsigned int np = in.dataLength * 8 / in.bpc;
   float *infptr = (float*) in.data;
 
   // Loop through our pixels for floating values
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
   for( unsigned int n=0; n<np; n++ ){
     float v = infptr[n];
     infptr[n] = 1.0 - v;
   }
 }
 
+
+
 // Resize image using nearest neighbour interpolation
-void filter_interpolate_nearestneighbour( RawTile& in, unsigned int resampled_width, unsigned int resampled_height ){
+void Transform::interpolate_nearestneighbour( RawTile& in, unsigned int resampled_width, unsigned int resampled_height ){
 
   // Pointer to input buffer
   float *buf = (float*)in.data;
@@ -421,6 +480,7 @@ void filter_interpolate_nearestneighbour( RawTile& in, unsigned int resampled_wi
   int channels = in.channels;
   unsigned int width = in.width;
   unsigned int height = in.height;
+
 
   // Calculate our scale
   float xscale = (float)width / (float)resampled_width;
@@ -437,7 +497,7 @@ void filter_interpolate_nearestneighbour( RawTile& in, unsigned int resampled_wi
 
       unsigned int resampled_index = (i + j*resampled_width)*channels;
       for( int k=0; k<in.channels; k++ ){
-        buf[resampled_index+k] = buf[pyramid_index+k];
+	buf[resampled_index+k] = buf[pyramid_index+k];
       }
     }
   }
@@ -445,14 +505,15 @@ void filter_interpolate_nearestneighbour( RawTile& in, unsigned int resampled_wi
   // Correctly set our Rawtile info
   in.width = resampled_width;
   in.height = resampled_height;
-  in.dataLength = resampled_width * resampled_height * channels * in.bpc/8;
+  in.dataLength = resampled_width * resampled_height * channels * (in.bpc/8);
 
 }
 
 
+
 // Resize image using bilinear interpolation
 //  - Floating point implementation which benchmarks about 2.5x slower than nearest neighbour
-void filter_interpolate_bilinear( RawTile& in, unsigned int resampled_width, unsigned int resampled_height ){
+void Transform::interpolate_bilinear( RawTile& in, unsigned int resampled_width, unsigned int resampled_height ){
 
   // Pointer to input buffer
   float *buf = (float*) in.data;
@@ -463,13 +524,17 @@ void filter_interpolate_bilinear( RawTile& in, unsigned int resampled_width, uns
   unsigned long np = in.channels * in.width * in.height;
 
   // Calculate our scale
-  float xscale = (float)width / (float)resampled_width;
-  float yscale = (float)height / (float)resampled_height;
+  float xscale = (float)(width) / (float)resampled_width;
+  float yscale = (float)(height) / (float)resampled_height;
 
+
+#if defined(__ICC) || defined(__INTEL_COMPILER)
+#pragma ivdep
+#endif
   for( unsigned int j=0; j<resampled_height; j++ ){
 
-    // Index to the current pyramid resolution's bottom left right pixel
-    unsigned int jj = (unsigned int) floorf(j*yscale);
+    // Index to the current pyramid resolution's top left pixel
+    int jj = (int) floor( j*yscale );
 
     // Calculate some weights - do this in the highest loop possible
     float jscale = j*yscale;
@@ -503,19 +568,10 @@ void filter_interpolate_bilinear( RawTile& in, unsigned int resampled_width, uns
       unsigned int resampled_index = j*resampled_width*in.channels + i*in.channels;
 
       for( int k=0; k<in.channels; k++ ){
-
-	// If we are exactly coincident with a bounding box pixel, use that pixel value.
-	// This should only ever occur on the top left p11 pixel.
-	// Otherwise perform our full interpolation
-	if( resampled_index == p11 ){
-	  buf[resampled_index+k] = buf[p11+k];
-	}
-	else{
-            float tx = buf[p11+k]*a + buf[p21+k]*b;
-	    float ty = buf[p12+k]*a + buf[p22+k]*b;
-	    float r = (float)( c*tx + d*ty );
-	    buf[resampled_index+k] = r;
-	}
+	float tx = buf[p11+k]*a + buf[p21+k]*b;
+	float ty = buf[p12+k]*a + buf[p22+k]*b;
+	float r = (float)( c*tx + d*ty );
+	buf[resampled_index+k] = r;
       }
     }
   }
@@ -523,20 +579,21 @@ void filter_interpolate_bilinear( RawTile& in, unsigned int resampled_width, uns
   // Correctly set our Rawtile info
   in.width = resampled_width;
   in.height = resampled_height;
-  in.dataLength = resampled_width * resampled_height * channels * in.bpc/8;
-
+  in.dataLength = resampled_width * resampled_height * channels * (in.bpc/8);
 }
 
 
 // Function to apply a contrast adjustment and clip to 8 bit
-void filter_contrast( RawTile& in, float c ){
+void Transform::contrast( RawTile& in, float c ){
 
-  unsigned int np = in.dataLength * 8 / in.bpc;
+  unsigned long np = in.width * in.height * in.channels;
   unsigned char* buffer = new unsigned char[np];
   float* infptr = (float*)in.data;
 
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-  for( unsigned int n=0; n<np; n++ ){
+#endif
+  for( unsigned long n=0; n<np; n++ ){
     float v = infptr[n] * 255.0 * c;
     buffer[n] = (unsigned char)( (v<255.0) ? (v<0.0? 0.0 : v) : 255.0 );
   }
@@ -545,13 +602,13 @@ void filter_contrast( RawTile& in, float c ){
   delete[] (float*) in.data;
   in.data = buffer;
   in.bpc = 8;
-  in.dataLength = np * in.bpc/8;
+  in.dataLength = np * (in.bpc/8);
 }
 
 
 
 // Gamma correction
-void filter_gamma( RawTile& in, float g ){
+void Transform::gamma( RawTile& in, float g ){
 
   if( g == 1.0 ) return;
 
@@ -559,7 +616,9 @@ void filter_gamma( RawTile& in, float g ){
   float* infptr = (float*)in.data;
 
   // Loop through our pixels for floating values
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
   for( unsigned int n=0; n<np; n++ ){
     float v = infptr[n];
     infptr[n] = powf( v<0.0 ? 0.0 : v, g );
@@ -569,7 +628,7 @@ void filter_gamma( RawTile& in, float g ){
 
 
 // Rotation function
-void filter_rotate( RawTile& in, float angle=0.0 ){
+void Transform::rotate( RawTile& in, float angle=0.0 ){
 
   // Currently implemented only for rectangular rotations
   if( (int)angle % 90 == 0 && (int)angle % 360 != 0 ){
@@ -582,7 +641,9 @@ void filter_rotate( RawTile& in, float angle=0.0 ){
 
     // Rotate 90
     if( (int) angle % 360 == 90 ){
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
       for( unsigned int i=0; i < in.width; i++ ){
 	unsigned int n = i*in.height*in.channels;
 	for( int j=in.height-1; j>=0; j-- ){
@@ -596,7 +657,9 @@ void filter_rotate( RawTile& in, float angle=0.0 ){
 
     // Rotate 270
     else if( (int) angle % 360 == 270 ){
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
       for( int i=in.width-1; i>=0; i-- ){
 	unsigned int n = (in.width-1-i)*in.height*in.channels;
 	for( unsigned int j=0; j<in.height; j++ ){
@@ -613,7 +676,7 @@ void filter_rotate( RawTile& in, float angle=0.0 ){
       for( int i=(in.width*in.height)-1; i >= 0; i-- ){
 	unsigned index = i * in.channels;
 	for( int k=0; k < in.channels; k++ ){
-	  ((unsigned char*)buffer)[n++]  = ((unsigned char*)in.data)[index+k];
+	  ((unsigned char*)buffer)[n++] = ((unsigned char*)in.data)[index+k];
 	}
       }
     }
@@ -638,7 +701,7 @@ void filter_rotate( RawTile& in, float angle=0.0 ){
 // Convert colour to grayscale using the conversion formula:
 //   Luminance = 0.2126*R + 0.7152*G + 0.0722*B
 // Note that we don't linearize before converting
-void filter_greyscale( RawTile& rawtile ){
+void Transform::greyscale( RawTile& rawtile ){
 
   if( rawtile.bpc != 8 || rawtile.channels != 3 ) return;
 
@@ -647,7 +710,9 @@ void filter_greyscale( RawTile& rawtile ){
 
   // Calculate using fixed-point arithmetic
   //  - benchmarks to around 25% faster than floating point
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
   for( unsigned int i=0; i<np; i++ ){
     unsigned int n = i*rawtile.channels;
     unsigned char R = ((unsigned char*)rawtile.data)[n++];
@@ -665,8 +730,10 @@ void filter_greyscale( RawTile& rawtile ){
   rawtile.dataLength = np;
 }
 
+
+
 // Apply twist or channel recombination to colour or multi-channel image
-void filter_twist( RawTile& rawtile, const vector< vector<float> >& matrix ){
+void Transform::twist( RawTile& rawtile, const vector< vector<float> >& matrix ){
 
   unsigned long np = rawtile.width * rawtile.height;
 
@@ -703,15 +770,17 @@ void filter_twist( RawTile& rawtile, const vector< vector<float> >& matrix ){
 
     // Only write our values at the end as we reuse channel values several times during the twist loops
     for( int k=0; k<rawtile.channels; k++ ) ((float*)rawtile.data)[n++] = pixel[k];
+
   }
   delete[] nrows;
   delete[] pixel;
 }
 
 
+
 // Flatten a multi-channel image to a given number of bands by simply stripping
 // away extra bands
-void filter_flatten( RawTile& in, int bands ){
+void Transform::flatten( RawTile& in, int bands ){
 
   // We cannot increase the number of channels
   if( bands >= in.channels ) return;
@@ -724,26 +793,29 @@ void filter_flatten( RawTile& in, int bands ){
   // Simply loop through assigning to the same buffer
   for( unsigned long i=0; i<np; i++ ){
     for( int k=0; k<bands; k++ ){
-      ((float*)in.data)[ni++] = ((float*)in.data)[no++];
+      ((unsigned char*)in.data)[ni++] = ((unsigned char*)in.data)[no++];
     }
     no += gap;
   }
 
   in.channels = bands;
-  in.dataLength = ni * in.bpc/8;
+  in.dataLength = ni * (in.bpc/8);
 }
 
 
+
 // Flip image in horizontal or vertical direction (0=horizontal,1=vertical)
-void filter_flip( RawTile& rawtile, int orientation ){
+void Transform::flip( RawTile& rawtile, int orientation ){
 
   unsigned char* buffer = new unsigned char[rawtile.width * rawtile.height * rawtile.channels];
 
   // Vertical
   if( orientation == 2 ){
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
     for( int j=rawtile.height-1; j>=0; j-- ){
-      unsigned long n = j*rawtile.width*rawtile.channels;
+      unsigned long n = (rawtile.height-1-j)*rawtile.width*rawtile.channels;
       for( unsigned int i=0; i<rawtile.width; i++ ){
         unsigned long index = (rawtile.width*j + i)*rawtile.channels;
         for( int k=0; k<rawtile.channels; k++ ){
@@ -754,7 +826,9 @@ void filter_flip( RawTile& rawtile, int orientation ){
   }
   // Horizontal
   else{
+#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
+#endif
     for( unsigned int j=0; j<rawtile.height; j++ ){
       unsigned long n = j*rawtile.width*rawtile.channels;
       for( int i=rawtile.width-1; i>=0; i-- ){
@@ -769,4 +843,141 @@ void filter_flip( RawTile& rawtile, int orientation ){
   // Delete our old data buffer and instead point to our grayscale data
   delete[] (unsigned char*) rawtile.data;
   rawtile.data = (void*) buffer;
+}
+
+
+
+// Calculate histogram of an image
+//  - Only calculate for 8 bits and a single histogram for all channels
+vector<unsigned int> Transform::histogram( RawTile& in, const vector<float>& max, const vector<float>& min ){
+
+  // An 8 bit (256 level) histogram should be sufficient
+  if( in.bpc > 8 ){
+    this->normalize( in, max, min );
+    this->contrast( in, 1.0 );
+  }
+
+  // Initialize our vector to zero - note that we use a single histogram for all channels
+  vector<unsigned int> histogram( (1<<in.bpc), 0 );
+
+  // Fill our histogram - for color or multiband images, use channel average
+  unsigned int np = in.width * in.height;
+  for( unsigned int n=0; n<np; n++ ){
+    float value = 0.0;
+
+    // For color or multiband images, use channel average
+    for( int k=0; k<in.channels; k++ ){
+      value += (float)(((unsigned char*)in.data)[n*in.channels + k]);
+    }
+    value = round( value/(float)in.channels );
+
+    // Update histogram
+    histogram[(unsigned int)value]++;
+  }
+
+  return histogram;
+}
+
+
+
+// Calculate the threshold for binary image segmentation using Otsu's method
+unsigned char Transform::threshold( vector<unsigned int>& histogram ){
+
+  const unsigned int bits = histogram.size();
+
+  // Calculate sum
+  float sum = 0.0, sumb = 0.0;
+  unsigned int np = 0;
+  for( unsigned int n=0; n<bits; n++ ){
+    np += histogram[n];
+    sum += (float)n * histogram[n];
+  }
+
+  // Calculate threshold
+  float wb = 0.0, wf = 0.0, mb = 0.0, mf = 0.0, max = 0.0;
+  unsigned char otsu = 0;
+  for( unsigned int n=0; n<bits; n++ ){
+    wb += histogram[n];
+    if( wb == 0.0 ) continue;
+
+    wf = np - wb;
+    if( wf == 0.0 ) break;
+
+    sumb += (float) n * histogram[n];
+    mb = sumb / wb;
+    mf = (sum-sumb) / wf;
+    float diff = wb * wf * (mb-mf) * (mb-mf);
+
+    if( diff > max ){
+      otsu = (unsigned char) n;
+      max = diff;
+    }
+  }
+  return otsu;
+}
+
+
+
+// Apply threshold to create binary image
+void Transform::binary( RawTile &in, unsigned char threshold ){
+
+  // Only apply to 8 bit images
+  if( in.bpc != 8 ) return;
+
+  // First make sure our image is greyscale
+  this->greyscale( in );
+
+  unsigned int np = in.width * in.height;
+
+#if defined(__ICC) || defined(__INTEL_COMPILER)
+#pragma ivdep
+#endif
+  for( unsigned int i=0; i<np; i++ ){
+    ((unsigned char*)in.data)[i] = ( ((unsigned char*)in.data)[i] < threshold ? (unsigned char)0 : (unsigned char)255 );
+  }
+}
+
+
+
+void Transform::equalize( RawTile& in, vector<unsigned int>& histogram ){
+
+  // Number of levels in our histogram
+  const unsigned int bits = histogram.size();
+
+  // Initialize our array to zero using std::fill
+  float cdf[bits];
+  fill( cdf, cdf+bits, 0.0 );
+
+  // Find first non-zero bin
+  unsigned int n0 = 0;
+  while( histogram[n0] == 0 ) ++n0;
+
+  // Calculate cumulative histogram
+  cdf[0] = histogram[0];
+  for( unsigned int i=1; i<bits; i++ ){
+    cdf[i] = cdf[i-1] + histogram[i];
+  }
+
+  // Scale our CDF
+  float scale = (float)(bits-1) / cdf[bits-1];
+  float cdfmin = cdf[n0] / (float)(in.width*in.height);
+#if defined(__ICC) || defined(__INTEL_COMPILER)
+#pragma ivdep
+#endif
+  for( unsigned int i=0; i<bits; i++ ){
+    cdf[i] = round( scale * (cdf[i]-cdfmin) );
+  }
+
+  // Map image through cumulative histogram
+#if defined(__ICC) || defined(__INTEL_COMPILER)
+#pragma ivdep
+#endif
+  for( unsigned int i=0; i<in.width*in.height; i++ ){
+    for( int j=0; j<in.channels; j++ ){
+      unsigned int index = i*in.channels + j;
+      unsigned int value = (unsigned int) (((unsigned char*)in.data)[index]);
+      ((unsigned char*)in.data)[index] = (unsigned char) cdf[value];
+    }
+  }
+
 }
