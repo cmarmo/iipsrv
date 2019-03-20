@@ -89,9 +89,7 @@ void Transform::normalize( RawTile& in, const vector<float>& max, const vector<f
     if( in.bpc == 32 && in.sampleType == FLOATINGPOINT ) {
       fptr = (float*)in.data;
       // Loop through our pixels for floating point pixels
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
       for( unsigned int n=c; n<np; n+=nc ){
         normdata[n] = isfinite(fptr[n])? (fptr[n] - minc) * invdiffc : 0.0;
       }
@@ -99,9 +97,7 @@ void Transform::normalize( RawTile& in, const vector<float>& max, const vector<f
     else if( in.bpc == 32 && in.sampleType == FIXEDPOINT ) {
       uiptr = (unsigned int*)in.data;
       // Loop through our pixels for unsigned int pixels
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
       for( unsigned int n=c; n<np; n+=nc ){
         normdata[n] = (uiptr[n] - minc) * invdiffc;
       }
@@ -109,9 +105,7 @@ void Transform::normalize( RawTile& in, const vector<float>& max, const vector<f
     else if( in.bpc == 16 ) {
       usptr = (unsigned short*)in.data;
       // Loop through our unsigned short pixels
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
       for( unsigned int n=c; n<np; n+=nc ){
         normdata[n] = (usptr[n] - minc) * invdiffc;
       }
@@ -119,9 +113,7 @@ void Transform::normalize( RawTile& in, const vector<float>& max, const vector<f
     else {
       ucptr = (unsigned char*)in.data;
       // Loop through our unsigned char pixels
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
       for( unsigned int n=c; n<np; n+=nc ){
         normdata[n] = (ucptr[n] - minc) * invdiffc;
       }
@@ -181,9 +173,7 @@ void Transform::shade( RawTile& in, int h_angle, int v_angle ){
   buffer = new float[ndata];
 
 
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
   for( unsigned int k=0; k<ndata; k++ ){
 
     unsigned int n = k*3;
@@ -310,9 +300,7 @@ void Transform::LAB2sRGB( RawTile& in ){
 
   unsigned long np = in.width * in.height * in.channels;
 
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
   for( unsigned long n=0; n<np; n+=in.channels ){
     unsigned char* ptr = (unsigned char*) in.data;
     unsigned char q[3];
@@ -345,9 +333,7 @@ void Transform::cmap( RawTile& in, enum cmap_type cmap ){
   switch(cmap){
 
     case HOT:
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
       for( int unsigned n=0; n<ndata; n+=in_chan, outv+=3 ){
         value = fptr[n];
         if(value>1.)
@@ -365,9 +351,7 @@ void Transform::cmap( RawTile& in, enum cmap_type cmap ){
       break;
 
     case COLD:
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
       for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ){
         value = fptr[n];
         if(value>1.)
@@ -385,9 +369,7 @@ void Transform::cmap( RawTile& in, enum cmap_type cmap ){
       break;
 
     case JET:
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
       for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ){
         value = fptr[n];
         if(value<0.)
@@ -407,9 +389,7 @@ void Transform::cmap( RawTile& in, enum cmap_type cmap ){
       break;
 
     case RED:
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
       for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ){
 	value = fptr[n];
 	outv[0] = value;
@@ -418,9 +398,7 @@ void Transform::cmap( RawTile& in, enum cmap_type cmap ){
       break;
 
     case GREEN:
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
       for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ) {
 	value = fptr[n];
 	outv[0] = outv[2] = 0.;
@@ -429,9 +407,7 @@ void Transform::cmap( RawTile& in, enum cmap_type cmap ){
       break;
 
     case BLUE:
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
       for( unsigned int n=0; n<ndata; n+=in_chan, outv+=3 ) {
 	value = fptr[n];
 	outv[0] = outv[1] = 0;
@@ -460,9 +436,7 @@ void Transform::inv( RawTile& in ){
   float *infptr = (float*) in.data;
 
   // Loop through our pixels for floating values
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
   for( unsigned int n=0; n<np; n++ ){
     float v = infptr[n];
     infptr[n] = 1.0 - v;
@@ -528,9 +502,7 @@ void Transform::interpolate_bilinear( RawTile& in, unsigned int resampled_width,
   float yscale = (float)(height) / (float)resampled_height;
 
 
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
   for( unsigned int j=0; j<resampled_height; j++ ){
 
     // Index to the current pyramid resolution's top left pixel
@@ -590,9 +562,7 @@ void Transform::contrast( RawTile& in, float c ){
   unsigned char* buffer = new unsigned char[np];
   float* infptr = (float*)in.data;
 
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
   for( unsigned long n=0; n<np; n++ ){
     float v = infptr[n] * 255.0 * c;
     buffer[n] = (unsigned char)( (v<255.0) ? (v<0.0? 0.0 : v) : 255.0 );
@@ -616,9 +586,7 @@ void Transform::gamma( RawTile& in, float g ){
   float* infptr = (float*)in.data;
 
   // Loop through our pixels for floating values
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
   for( unsigned int n=0; n<np; n++ ){
     float v = infptr[n];
     infptr[n] = powf( v<0.0 ? 0.0 : v, g );
@@ -641,9 +609,7 @@ void Transform::rotate( RawTile& in, float angle=0.0 ){
 
     // Rotate 90
     if( (int) angle % 360 == 90 ){
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
       for( unsigned int i=0; i < in.width; i++ ){
 	unsigned int n = i*in.height*in.channels;
 	for( int j=in.height-1; j>=0; j-- ){
@@ -657,9 +623,7 @@ void Transform::rotate( RawTile& in, float angle=0.0 ){
 
     // Rotate 270
     else if( (int) angle % 360 == 270 ){
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
       for( int i=in.width-1; i>=0; i-- ){
 	unsigned int n = (in.width-1-i)*in.height*in.channels;
 	for( unsigned int j=0; j<in.height; j++ ){
@@ -710,9 +674,7 @@ void Transform::greyscale( RawTile& rawtile ){
 
   // Calculate using fixed-point arithmetic
   //  - benchmarks to around 25% faster than floating point
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
   for( unsigned int i=0; i<np; i++ ){
     unsigned int n = i*rawtile.channels;
     unsigned char R = ((unsigned char*)rawtile.data)[n++];
@@ -811,9 +773,7 @@ void Transform::flip( RawTile& rawtile, int orientation ){
 
   // Vertical
   if( orientation == 2 ){
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
     for( int j=rawtile.height-1; j>=0; j-- ){
       unsigned long n = (rawtile.height-1-j)*rawtile.width*rawtile.channels;
       for( unsigned int i=0; i<rawtile.width; i++ ){
@@ -826,9 +786,7 @@ void Transform::flip( RawTile& rawtile, int orientation ){
   }
   // Horizontal
   else{
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
     for( unsigned int j=0; j<rawtile.height; j++ ){
       unsigned long n = j*rawtile.width*rawtile.channels;
       for( int i=rawtile.width-1; i>=0; i-- ){
@@ -929,9 +887,7 @@ void Transform::binary( RawTile &in, unsigned char threshold ){
 
   unsigned int np = in.width * in.height;
 
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
   for( unsigned int i=0; i<np; i++ ){
     ((unsigned char*)in.data)[i] = ( ((unsigned char*)in.data)[i] < threshold ? (unsigned char)0 : (unsigned char)255 );
   }
@@ -961,17 +917,13 @@ void Transform::equalize( RawTile& in, vector<unsigned int>& histogram ){
   // Scale our CDF
   float scale = (float)(bits-1) / cdf[bits-1];
   float cdfmin = cdf[n0] / (float)(in.width*in.height);
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
   for( unsigned int i=0; i<bits; i++ ){
     cdf[i] = round( scale * (cdf[i]-cdfmin) );
   }
 
   // Map image through cumulative histogram
-#if defined(__ICC) || defined(__INTEL_COMPILER)
 #pragma ivdep
-#endif
   for( unsigned int i=0; i<in.width*in.height; i++ ){
     for( int j=0; j<in.channels; j++ ){
       unsigned int index = i*in.channels + j;
